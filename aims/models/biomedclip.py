@@ -82,8 +82,7 @@ class BiomedCLIPModel(nn.Module):
             else:
                 prompt = [f"Medical image. {q}" for q in question]
 
-        # 배치 내 모든 샘플에 동일 질문 적용
-        text_tokens   = self.tokenizer([prompt] * image.shape[0]).to(device)
+        text_tokens   = self.tokenizer(prompt).to(device)
         text_features = self.text_encoder(text_tokens)          # (B, 512)
         text_features = text_features / text_features.norm(
             dim=-1, keepdim=True

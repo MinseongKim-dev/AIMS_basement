@@ -11,6 +11,7 @@ RTX 3050 4GB 기준:
     - gradient accumulation: steps=4 (effective batch=32)
 """
 
+import os
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
@@ -147,6 +148,7 @@ def train_model(
     val_loader: DataLoader,
     lr: float,
     config: dict,
+    save_path: str = None,
 ) -> float:
     """단일 모델 학습 및 평가 루프."""
     """
@@ -162,6 +164,13 @@ def train_model(
     Returns:
         best_val_accuracy
     """
+    if save_path and os.path.exists(save_path):
+        print(f"  저장된 가중치 로드: {save_path}")
+        model.load_state_dict(torch.load(save_path, map_location="cpu"))
+        val_acc = evaluate(model.to(config["device"]), val_loader, config["device"])
+        print(f"  로드된 모델 val_acc: {val_acc:.1%}")
+        return val_acc
+
     device    = config["device"]
     epochs    = config["epochs"]
     accum     = config["accumulation_steps"]
@@ -194,6 +203,9 @@ def train_model(
 
         if val_acc > best_acc:
             best_acc = val_acc
+            if save_path:
+                os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+                torch.save(model.state_dict(), save_path)
 
         print(f"  epoch {epoch:2d}/{epochs} | "
               f"loss={train_loss:.4f} | "
@@ -248,20 +260,22 @@ def run_comparison():
 
     print(f"train: {train_size} | val: {val_size} | test: {len(test_set)}\n")
 
+    os.makedirs("data/checkpoints", exist_ok=True)
+
     # 2. 3가지 설정 실험
     experiments = [
-        ("SimpleMedCNN",  SimpleMedCNN(),                        CONFIG["lr"]),
-        ("ViT-frozen",    VisualTransformerModel(freeze=True),   CONFIG["lr"]),
-        ("ViT-full",      VisualTransformerModel(freeze=False),  CONFIG["lr_full"]),
-        ("BiomedCLIP", BiomedCLIPModel(freeze_backbone=True), CONFIG["lr"]),
+        ("SimpleMedCNN",  SimpleMedCNN(),                        CONFIG["lr"],     "data/checkpoints/simplecnn.pt"),
+        ("ViT-frozen",    VisualTransformerModel(freeze=True),   CONFIG["lr"],     "data/checkpoints/vit_frozen.pt"),
+        ("ViT-full",      VisualTransformerModel(freeze=False),  CONFIG["lr_full"],"data/checkpoints/vit_full.pt"),
+        ("BiomedCLIP",    BiomedCLIPModel(freeze_backbone=True), CONFIG["lr"],     "data/checkpoints/biomedclip.pt"),
     ]
 
     results = {}
-    for name, model, lr in experiments:
+    for name, model, lr, ckpt in experiments:
         print(f"[{name}] 학습 시작")
         print(f"  학습 파라미터: {model.trainable_params() if hasattr(model, 'trainable_params') else '전체'}")
 
-        best_val = train_model(model, train_loader, val_loader, lr, CONFIG)
+        best_val = train_model(model, train_loader, val_loader, lr, CONFIG, save_path=ckpt)
         test_acc = evaluate(model, test_loader, device)
 
         results[name] = {"val": best_val, "test": test_acc}
