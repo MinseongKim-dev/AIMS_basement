@@ -9,6 +9,7 @@ TODO:
 """
 
 import torch
+import wandb
 from dataclasses import dataclass, field
 from typing import Dict, List
 from torch.utils.data import DataLoader
@@ -36,9 +37,6 @@ class ExperimentResult:
     
     """
     mode: ModeType
-    accuracy: float
-    rag_rate: float
-    expert_rate: float
     n_total: int = 0
     n_correct: int = 0
     n_rag: int = 0
@@ -74,7 +72,7 @@ def run_experiment(
     Returns:
         ExperimentResult: 실험 결과
     """
-    result = ExperimentResult(mode=mode, accuracy=0.0, rag_rate=0.0, expert_rate=0.0)
+    result = ExperimentResult(mode=mode)
     for images, questions, labels in dataloader:
         images = images.to(device)
         labels = labels.to(device)
@@ -123,6 +121,20 @@ def run_comparison():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device: {device}")
 
+    # W&B 초기화
+    wandb.init(
+        project="AIMS", 
+        name="pipeline-comparison",
+        config={
+            "model":      "BiomedCLIP",
+            "dataset":    "VQA-RAD (yes/no)",
+            "tau_low":    0.5,
+            "tau_high":   0.8,
+            "k":          3,
+
+        }
+    )
+
     # 1. 데이터 로드
     train_data, test_data = load_vqarad(only_yes_no=True)
     test_dataset = VQARadDataset(test_data)
@@ -158,19 +170,36 @@ def run_comparison():
         print(f"  정확도: {r.accuracy:.1%} | "
               f"RAG: {r.rag_rate:.1%} | "
               f"Expert: {r.expert_rate:.1%}")
+        
+        # W&B 로깅 - 설정별 결과
+
+        wandb.log({
+            f"{mode}/accuracy": r.accuracy,
+            f"{mode}/rag_rate": r.rag_rate,
+            f"{mode}/expert_rate": r.expert_rate,
+            f"{mode}/n_total": r.n_total,
+            f"{mode}/n_correct": r.n_correct,
+        })
+
 
     # 5. 최종 결과 출력
     print_results(results)
 
-    # TODO: W&B 로깅
-    # import wandb
-    # wandb.init(project="AIMS", name="comparison")
-    # for mode, r in results.items():
-    #     wandb.log({
-    #         f"{mode}/accuracy":    r.accuracy,
-    #         f"{mode}/rag_rate":    r.rag_rate,
-    #         f"{mode}/expert_rate": r.expert_rate,
-    #     })
+    # W&B 요약 테이블
+
+    table = wandb.Table(columns=["설정","정확도", "RAG 호출률", "Expert 이관율"])
+
+    for mode, r in results.items():
+        table.add_data(
+            mode,
+            r.accuracy,
+            r.rag_rate,
+            r.expert_rate
+        )
+
+    wandb.log({"results_table": table})
+    wandb.finish()
+
 
     return results
 

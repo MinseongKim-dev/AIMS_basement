@@ -51,7 +51,9 @@ def compute_entropy(logits: torch.Tensor) -> torch.Tensor:
     raw_entropy = -(probs * log_probs).sum(dim=-1)  # (N,)
 
     # 정규화: [0, 1] 범위로
-    max_entropy = torch.log(torch.tensor(float(num_classes)))
+    max_entropy = torch.log(
+        torch.tensor(float(num_classes), device=logits.device)
+    )
     normalized = raw_entropy / max_entropy
 
     return normalized.squeeze()
@@ -108,6 +110,7 @@ def mc_dropout_entropy(
     Returns:
         scalar, 정규화된 entropy [0, 1]
     """
+    was_training = model.training
     model.train()   # dropout 활성화 (eval()이면 dropout이 꺼짐)
 
     with torch.no_grad():
@@ -123,9 +126,9 @@ def mc_dropout_entropy(
     num_classes = mean_probs.shape[0]
     log_probs = torch.log(mean_probs.clamp(min=1e-9))
     raw_entropy = -(mean_probs * log_probs).sum()
-    max_entropy = torch.log(torch.tensor(float(num_classes)))
+    max_entropy = torch.log(torch.tensor(float(num_classes), device=image.device))
 
-    model.eval()    # 다시 eval 모드로
+    model.train(was_training)
     return (raw_entropy / max_entropy).item()
 
 

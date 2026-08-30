@@ -90,7 +90,8 @@ class HybridRetriever:
         self, query: str, k: int = 5
     ) -> List[Tuple[Document, float]]:
         """RRF 점수도 함께 반환 (디버깅/분석용)."""
-        return zip(*self._hybrid_search(query, k))
+        docs, scores = self._hybrid_search(query, k)
+        return list(zip(docs, scores))
 
     # ------------------------------------------------------------------ #
     # Private                                                              #

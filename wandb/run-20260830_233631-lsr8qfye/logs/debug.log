@@ -1,0 +1,24 @@
+2026-08-30 23:36:31,222 INFO    MainThread:28120 [wandb_setup.py:_flush():81] Current SDK version is 0.29.0
+2026-08-30 23:36:31,222 INFO    MainThread:28120 [wandb_setup.py:_flush():81] Configure stats pid to 28120
+2026-08-30 23:36:31,222 INFO    MainThread:28120 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2026-08-30 23:36:31,222 INFO    MainThread:28120 [wandb_init.py:setup_run_log_directory():739] Logging user logs to C:\Users\Minseong_Kim\AIMS_basement\wandb\run-20260830_233631-lsr8qfye\logs\debug.log
+2026-08-30 23:36:31,223 INFO    MainThread:28120 [wandb_init.py:setup_run_log_directory():740] Logging internal logs to C:\Users\Minseong_Kim\AIMS_basement\wandb\run-20260830_233631-lsr8qfye\logs\debug-internal.log
+2026-08-30 23:36:31,224 INFO    MainThread:28120 [wandb_init.py:init():783] calling init triggers
+2026-08-30 23:36:31,224 INFO    MainThread:28120 [wandb_init.py:init():788] wandb.init called with sweep_config: {}
+config: {'model': 'BiomedCLIP', 'dataset': 'VQA-RAD (yes/no)', 'tau_low': 0.5, 'tau_high': 0.8, 'k': 3, '_wandb': {}}
+2026-08-30 23:36:31,224 INFO    MainThread:28120 [wandb_init.py:init():831] starting backend
+2026-08-30 23:36:31,224 INFO    MainThread:28120 [wandb_init.py:init():846] sending inform_init request
+2026-08-30 23:36:33,465 INFO    MainThread:28120 [wandb_init.py:init():851] backend started and connected
+2026-08-30 23:36:33,467 INFO    MainThread:28120 [wandb_init.py:init():921] updated telemetry
+2026-08-30 23:36:33,726 INFO    MainThread:28120 [wandb_init.py:init():944] communicating run to backend with 90.0 second timeout
+2026-08-30 23:36:34,612 INFO    MainThread:28120 [wandb_init.py:init():981] starting run threads in backend
+2026-08-30 23:36:34,790 INFO    MainThread:28120 [wandb_run.py:_console_start():2545] atexit reg
+2026-08-30 23:36:34,790 INFO    MainThread:28120 [wandb_run.py:_redirect():2395] redirect: wrap_raw
+2026-08-30 23:36:34,791 INFO    MainThread:28120 [wandb_run.py:_redirect():2464] Wrapping output streams.
+2026-08-30 23:36:34,791 INFO    MainThread:28120 [wandb_run.py:_redirect():2487] Redirects installed.
+2026-08-30 23:36:34,796 INFO    MainThread:28120 [wandb_init.py:init():1019] run started, returning control to user process
+2026-08-30 23:37:14,583 INFO    MainThread:28120 [wandb_run.py:_finish():2316] finishing run alstjd8968-sungkyunkwan-university/AIMS/lsr8qfye
+2026-08-30 23:37:14,584 INFO    MainThread:28120 [wandb_run.py:_atexit_cleanup():2512] got exitcode: 0
+2026-08-30 23:37:14,585 INFO    MainThread:28120 [wandb_run.py:_restore():2494] restore
+2026-08-30 23:37:14,585 INFO    MainThread:28120 [wandb_run.py:_restore():2500] restore done
+2026-08-30 23:37:17,078 INFO    MainThread:28120 [wandb_run.py:_footer_sync_info():3917] logging synced files

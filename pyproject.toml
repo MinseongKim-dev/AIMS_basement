@@ -1,10 +1,24 @@
 [build-system]
 requires = ["setuptools>=61"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "aims"
 version = "0.1.0"
+description = "AIMS baseline project for medical VQA experiments"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+	"torch",
+	"torchvision",
+	"transformers",
+	"datasets",
+	"pillow",
+	"sentence-transformers",
+	"faiss-cpu",
+	"rank-bm25",
+	"numpy",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
