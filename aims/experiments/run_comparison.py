@@ -2,12 +2,10 @@
 
 출력:
     설정별 정확도 / RAG 호출률 / expert 이관율 비교 테이블
-
-TODO:
-    - W&B 로깅 추가 (wandb.init, wandb.log)
-    - ViT/BiomedCLIP 교체 후 재실험
+    results/comparison_results.json 에 저장 (visualize.py 입력)
 """
 
+import json
 import os
 import torch
 import wandb
@@ -208,6 +206,24 @@ def run_comparison():
     wandb.log({"results_table": table})
     wandb.finish()
 
+    # JSON 저장 (visualize.py 입력용)
+    os.makedirs("results", exist_ok=True)
+    save_data = {
+        mode: {
+            "accuracy":    r.accuracy,
+            "rag_rate":    r.rag_rate,
+            "expert_rate": r.expert_rate,
+            "n_total":     r.n_total,
+            "n_correct":   r.n_correct,
+            "n_rag":       r.n_rag,
+            "n_expert":    r.n_expert,
+        }
+        for mode, r in results.items()
+    }
+    out_path = "results/comparison_results.json"
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(save_data, f, indent=2, ensure_ascii=False)
+    print(f"\n결과 저장: {out_path}")
 
     return results
 
