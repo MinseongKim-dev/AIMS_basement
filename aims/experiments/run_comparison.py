@@ -8,6 +8,7 @@ TODO:
     - ViT/BiomedCLIP 교체 후 재실험
 """
 
+import os
 import torch
 import wandb
 from dataclasses import dataclass, field
@@ -15,7 +16,7 @@ from typing import Dict, List
 from torch.utils.data import DataLoader
 
 from aims.data.dataset import load_vqarad,VQARadDataset
-from aims.models.medcnn import SimpleMedCNN
+from aims.models.biomedclip import BiomedCLIPModel
 from aims.rag.embed import EmbedIndexer
 from aims.rag.pipeline import AIMSPipeline, ModeType
 
@@ -121,17 +122,19 @@ def run_comparison():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device: {device}")
 
+    BIOMEDCLIP_CKPT = "data/checkpoints/biomedclip.pt"
+
     # W&B 초기화
     wandb.init(
-        project="AIMS", 
-        name="pipeline-comparison",
+        project="AIMS",
+        name="pipeline-comparison-biomedclip",
         config={
             "model":      "BiomedCLIP",
             "dataset":    "VQA-RAD (yes/no)",
             "tau_low":    0.5,
             "tau_high":   0.8,
             "k":          3,
-
+            "checkpoint": BIOMEDCLIP_CKPT,
         }
     )
 
@@ -155,8 +158,13 @@ def run_comparison():
         indexer.build_from_hf(train_data)
         indexer.save("data/faiss_index")
 
-    # 3. 파이프라인 생성
-    model    = SimpleMedCNN()
+    # 3. 파이프라인 생성 (학습된 BiomedCLIP 사용)
+    model = BiomedCLIPModel(freeze_backbone=True)
+    if os.path.exists(BIOMEDCLIP_CKPT):
+        print(f"BiomedCLIP 체크포인트 로드: {BIOMEDCLIP_CKPT}")
+        model.load_state_dict(torch.load(BIOMEDCLIP_CKPT, map_location="cpu"))
+    else:
+        print("경고: BiomedCLIP 체크포인트 없음 → 사전학습 가중치만 사용 (train_ViT.py 먼저 실행)")
     pipeline = AIMSPipeline(model, indexer, device=device)
 
     # 4. 4개 설정 실험
