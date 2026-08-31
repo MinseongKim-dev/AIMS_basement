@@ -88,43 +88,38 @@ def mc_dropout_entropy(
     model: torch.nn.Module,
     image: torch.Tensor,
     n_samples: int = 10,
-) -> torch.Tensor:
+    question: str = None,
+) -> float:
     """
     MC Dropout으로 불확실성을 추정합니다.
 
-    일반 entropy vs MC Dropout entropy:
-        일반: 단일 forward pass → 모델이 확신하는 척 할 수 있음
-        MC Dropout: dropout을 켠 채로 N번 forward → 예측 분산을 봄
-            → 모델이 진짜로 불확실한지 더 잘 포착
-
-    동작 방식:
-        1. model.train() → dropout 활성화
-        2. N번 forward pass → (N, num_classes) logits
-        3. 평균 확률로 entropy 계산
+    BiomedCLIP처럼 text_encoder를 가진 모델은 question을 함께 전달합니다.
+    Dropout 레이어가 있는 head 부분에만 dropout이 적용됩니다.
 
     Args:
-        model: SimpleMedCNN 등 Dropout 레이어가 있는 모델
-        image: (1, 3, H, W) 단일 이미지 텐서
-        n_samples: dropout 샘플 수 (많을수록 정확, 느림)
+        model:     Dropout 레이어가 있는 모델 (SimpleMedCNN, BiomedCLIP 등)
+        image:     (1, 3, H, W) 단일 이미지 텐서
+        n_samples: dropout 샘플 수
+        question:  VLM용 질문 문자열 (BiomedCLIP 등에서 사용)
 
     Returns:
-        scalar, 정규화된 entropy [0, 1]
+        scalar float, 정규화된 entropy [0, 1]
     """
     was_training = model.training
-    model.train()   # dropout 활성화 (eval()이면 dropout이 꺼짐)
+    model.train()
 
     with torch.no_grad():
-        # N번 forward → (N, num_classes)
-        logits_list = [model(image) for _ in range(n_samples)]
+        if hasattr(model, 'text_encoder') and question is not None:
+            logits_list = [model(image, [question]) for _ in range(n_samples)]
+        else:
+            logits_list = [model(image) for _ in range(n_samples)]
         logits_stack = torch.stack(logits_list, dim=0).squeeze(1)  # (N, C)
 
-    # 평균 확률로 entropy 계산
-    probs = F.softmax(logits_stack, dim=-1)   # (N, C)
-    mean_probs = probs.mean(dim=0)            # (C,)
+    probs      = F.softmax(logits_stack, dim=-1)
+    mean_probs = probs.mean(dim=0)
 
-    # compute_entropy는 logits를 받으므로 log로 역변환 대신 직접 계산
     num_classes = mean_probs.shape[0]
-    log_probs = torch.log(mean_probs.clamp(min=1e-9))
+    log_probs   = torch.log(mean_probs.clamp(min=1e-9))
     raw_entropy = -(mean_probs * log_probs).sum()
     max_entropy = torch.log(torch.tensor(float(num_classes), device=image.device))
 
