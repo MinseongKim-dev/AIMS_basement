@@ -116,11 +116,69 @@ def print_results(results: Dict[str, ExperimentResult]) -> None:
     print("=" * 62)
 
 
+def _check_prediction_diversity(
+    model: "BiomedCLIPModel",
+    loader: DataLoader,
+    device: str,
+    n_samples: int = 30,
+) -> float:
+    """처음 n_samples개 샘플에 대해 예측 다양성(다른 클래스 예측 비율)을 반환.
+
+    반환값이 0.0이면 모든 예측이 동일 클래스 → 학습 필요.
+    """
+    model.eval()
+    preds = []
+    count = 0
+    with torch.no_grad():
+        for images, questions, _ in loader:
+            images = images.to(device)
+            for i in range(len(images)):
+                if count >= n_samples:
+                    break
+                img = images[i].unsqueeze(0)
+                q   = questions[i]
+                logits = model(img, [q])
+                preds.append(logits.argmax(dim=-1).item())
+                count += 1
+            if count >= n_samples:
+                break
+
+    if not preds:
+        return 0.0
+    unique = len(set(preds))
+    diversity = (unique - 1) / max(len(set([0, 1])) - 1, 1)  # 0.0 = 단일 클래스, 1.0 = 완전 분산
+    return diversity
+
+
 def run_comparison():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device: {device}")
 
     BIOMEDCLIP_CKPT = "data/checkpoints/biomedclip.pt"
+
+    # ── pre-flight: 체크포인트 확인 ──────────────────────────────────
+    if not os.path.exists(BIOMEDCLIP_CKPT):
+        print()
+        print("=" * 62)
+        print("  [오류] BiomedCLIP 체크포인트 없음!")
+        print(f"  경로: {BIOMEDCLIP_CKPT}")
+        print()
+        print("  체크포인트가 없으면 linear head가 랜덤 초기화 상태이므로")
+        print("  baseline = always_rag = adaptive ≈ 53% (다수 클래스)가 됩니다.")
+        print()
+        print("  먼저 학습을 실행하세요:")
+        print("    python -m aims.models.train_ViT")
+        print("=" * 62)
+        print()
+        print("  체크포인트 없이 계속하려면 Ctrl+C로 중단하세요.")
+        print("  10초 후 사전학습 가중치만으로 계속 진행합니다...")
+        import time
+        try:
+            time.sleep(10)
+        except KeyboardInterrupt:
+            print("\n  중단됨.")
+            return {}
+        print()
 
     # W&B 초기화
     wandb.init(
@@ -133,6 +191,7 @@ def run_comparison():
             "tau_high":   0.8,
             "k":          3,
             "checkpoint": BIOMEDCLIP_CKPT,
+            "has_checkpoint": os.path.exists(BIOMEDCLIP_CKPT),
         }
     )
 
@@ -162,7 +221,19 @@ def run_comparison():
         print(f"BiomedCLIP 체크포인트 로드: {BIOMEDCLIP_CKPT}")
         model.load_state_dict(torch.load(BIOMEDCLIP_CKPT, map_location="cpu"))
     else:
-        print("경고: BiomedCLIP 체크포인트 없음 → 사전학습 가중치만 사용 (train_ViT.py 먼저 실행)")
+        print("경고: 사전학습 가중치만 사용 중 (결과가 무의미할 수 있음)")
+
+    # ── pre-flight: 예측 다양성 확인 ────────────────────────────────
+    print("\n[진단] baseline 예측 다양성 확인 중 (30샘플)...")
+    diversity = _check_prediction_diversity(model.to(device), test_loader, device)
+    if diversity == 0.0:
+        print("  [경고] 모델이 모든 샘플을 동일 클래스로 예측합니다!")
+        print("  → 학습된 체크포인트 없이 실행 중일 가능성이 높습니다.")
+        print("  → baseline = always_rag = adaptive 가 동일하게 나올 것입니다.")
+        print("  → train_ViT.py 실행 후 다시 시도하세요.\n")
+    else:
+        print(f"  예측 다양성 OK (두 클래스 모두 예측함)\n")
+
     pipeline = AIMSPipeline(model, indexer, device=device)
 
     # 4. 4개 설정 실험
