@@ -10,6 +10,7 @@ adaptive 모드에서 각 방식으로 라우팅한 결과를 W&B에 기록합�
     python -m aims.experiments.run_mcdropout
 """
 
+import json
 import os
 import torch
 import wandb
@@ -162,6 +163,12 @@ def run_mcdropout():
         table.add_data(name, r.accuracy, r.rag_rate)
     wandb.log({"mcdropout_comparison": table})
     wandb.finish()
+
+    os.makedirs("results", exist_ok=True)
+    out = {k: {"accuracy": v.accuracy, "rag_rate": v.rag_rate} for k, v in results.items()}
+    with open("results/mcdropout_results.json", "w") as f:
+        json.dump(out, f, indent=2)
+    print("결과 저장: results/mcdropout_results.json")
 
     return results
 

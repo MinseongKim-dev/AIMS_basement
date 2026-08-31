@@ -12,6 +12,7 @@ test set 전체 logits를 수집하고 ECE를 계산합니다.
         from aims.uncertainty.metrics import compute_ece
 """
 
+import json
 import os
 import torch
 import wandb
@@ -121,6 +122,11 @@ def run_ece():
         table.add_data(name, r["ece"], r["accuracy"])
     wandb.log({"ece_table": table})
     wandb.finish()
+
+    os.makedirs("results", exist_ok=True)
+    with open("results/ece_results.json", "w") as f:
+        json.dump(results, f, indent=2)
+    print("결과 저장: results/ece_results.json")
 
     return results
 
