@@ -7,3 +7,6 @@ sentence-transformers
 faiss-cpu
 rank-bm25
 numpy
+open_clip_torch
+wandb
+matplotlib
