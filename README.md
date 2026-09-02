@@ -1,5 +1,4 @@
-# AIMS — Adaptive Inference with Medical Similarity
-
+# AIMS — Adaptive Intelligent Medical System
 Medical VQA (Visual Question Answering) 실험 프레임워크.
 BiomedCLIP 기반 분류기에 불확실성 추정 + RAG를 결합해 yes/no 질문에 답하는 파이프라인입니다.
 
