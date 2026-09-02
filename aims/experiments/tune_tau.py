@@ -15,6 +15,7 @@ from itertools import product
 from torch.utils.data import DataLoader, Subset
 
 from aims.data.dataset import load_vqarad, VQARadDataset
+from aims.experiments import wandb_init
 from aims.models.biomedclip import BiomedCLIPModel
 from aims.rag.embed import EmbedIndexer
 from aims.rag.pipeline import AIMSPipeline
@@ -102,7 +103,7 @@ def tune_tau():
     pipeline = AIMSPipeline(model, indexer, device=device)
 
     # 4. W&B
-    wandb.init(
+    wandb_init(
         project="AIMS",
         name="tau-tuning",
         config={

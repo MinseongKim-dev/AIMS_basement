@@ -20,6 +20,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from aims.data.dataset import load_vqarad, VQARadDataset
+from aims.experiments import wandb_init
 from aims.models.biomedclip import BiomedCLIPModel
 from aims.models.medcnn import SimpleMedCNN
 from aims.models.ViT import VisualTransformerModel
@@ -66,7 +67,7 @@ def run_ece():
     test_loader  = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=0)
     print(f"test 샘플 수: {len(test_dataset)}")
 
-    wandb.init(
+    wandb_init(
         project="AIMS",
         name="ece-calibration",
         config={"dataset": "VQA-RAD (yes/no)", "n_bins": 10}

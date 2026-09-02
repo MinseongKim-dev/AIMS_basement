@@ -92,7 +92,7 @@ def train_epoch(
     for step, (images, questions, labels) in enumerate(dataloader):
         images, labels = images.to(device), labels.to(device)
 
-        with autocast(device_type="cuda"):
+        with autocast(device_type=device, enabled=(device == "cuda")):
             # BiomedCLIP은 이미지와 질문을 함께 입력받아 logits를 반환, 나머지는 무시
             if hasattr(model, 'text_encoder'):
                 logits=model(images,list(questions))
@@ -191,7 +191,7 @@ def train_model(
         schedulers=[warmup, cosine], 
         milestones=[warmup_epochs]
     )
-    scaler    = GradScaler(device="cuda")
+    scaler    = GradScaler(device=device, enabled=(device == "cuda"))
 
     best_acc = 0.0
 

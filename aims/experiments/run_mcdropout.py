@@ -19,6 +19,7 @@ from typing import Dict
 from torch.utils.data import DataLoader
 
 from aims.data.dataset import load_vqarad, VQARadDataset
+from aims.experiments import wandb_init
 from aims.models.biomedclip import BiomedCLIPModel
 from aims.rag.embed import EmbedIndexer
 from aims.rag.pipeline import AIMSPipeline
@@ -80,7 +81,7 @@ def run_mcdropout():
     pipeline = AIMSPipeline(model, indexer, device=device, tau_low=TAU_LOW, tau_high=TAU_HIGH)
 
     # 4. W&B
-    wandb.init(
+    wandb_init(
         project="AIMS",
         name="mcdropout-vs-entropy",
         config={
