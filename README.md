@@ -28,7 +28,7 @@ Phi-3와 Phi-3.5V는 **폴더를 나눈다.** 모델 내부 구조(모듈 이름
 ## 시작하기
 
 ```bash
-pip install -r requirements-common.txt
+pip install -r requirements.txt
 python tools/fetch_author_assets.py        # 저자 레포의 processor 파일을 고정 커밋에서 받는다 (저자 레포에 라이선스가 없어 복사해 올리지 않음)
 python tools/hf_sync.py download --entry <manifests/checkpoints.json 의 이름>     # 체크포인트 받기
 ```
