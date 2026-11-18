@@ -1,11 +1,12 @@
 # 공통 환경 (팀 결정: transformers==4.44.2).
 # 고정 버전은 팀원 레포(each-yi/phi3_urp)가 Colab에서 Phi-3-vision으로 실제 실행한 조합과 같다.
-# Phi-3.5V 에서의 동작은 아직 검증하지 않았다 → phi35/README.md 의 스모크 점검을 먼저 한다.
+# Phi-3.5V 는 스모크 점검 통과 (VQA-RAD ckpt-257, SLAKE ckpt-380 둘 다): 베이스라인 50/50 일치, 중립 CFG = 일반 생성 5/5, KV 캐시 3/3. 이 환경으로 확정.
+# 검증 환경: Colab Python 3.12.13, torch 2.11.0+cu128, numpy 1.26.4, L4, bf16, eager. (Python 3.13 은 numpy<2 때문에 쓰지 않는다)
+# bitsandbytes 는 제외한다: 0.44.1 은 triton.ops 를 import 하는데 torch 2.11/triton 3.6 에는 없다. 양자화(QLoRA)를 쓸 때만 따로 정한다.
 # torch / torchvision 은 실행 환경(Colab)의 기본값을 쓰고, 실행 때마다 버전을 결과에 기록한다.
 transformers==4.44.2
 peft==0.12.0
 accelerate==0.34.2
-bitsandbytes==0.44.1
 huggingface-hub==0.25.2
 datasets==2.21.0
 open_clip_torch==2.26.1

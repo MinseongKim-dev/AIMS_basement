@@ -1,2 +1,2 @@
 -r ../requirements.txt
-# Phi-3.5-vision: 모델 원격 코드는 저자와 모델 카드가 transformers 4.43.0 을 기준으로 한다. 4.44.2 에서의 동작은 미검증.
+# Phi-3.5-vision: 모델 원격 코드는 저자와 모델 카드가 transformers 4.43.0 을 기준으로 한다. 4.44.2 에서는 스모크 점검 통과(VQA-RAD ckpt-257 · SLAKE ckpt-380, 2026-11 Colab Python 3.12 / torch 2.11). 전체 문항 재현은 아직.
