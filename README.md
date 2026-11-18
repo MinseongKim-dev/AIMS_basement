@@ -14,7 +14,6 @@ manifests/         체크포인트·큰 파일의 HF 위치, 커밋 해시, sha2
 results/           실행 결과 요약 (형식: results/SCHEMA.md)
 tools/             저자 파일 받기, HF 업로드·다운로드
 docs/RULES.md      규칙(프로토콜 구분, 공식 채점, 작업 규칙)
-legacy/aims_v1/    이전 AIMS 프로젝트 코드 (참고용. ECE, MC Dropout 코드가 있음)
 ```
 
 Phi-3와 Phi-3.5V는 **폴더를 나눈다.** 모델 내부 구조(모듈 이름, 마스크 처리)에 의존하는 CFG 훅이 모델마다 다르기 때문이다.
