@@ -1,0 +1,10 @@
+# 공통 (채점, 검색 파일 생성, 동기화 도구). 모델별 requirements 는 phi3/, phi35/ 에 있다.
+# 팀 결정: transformers==4.44.2. 나머지는 Phi-3.5V 스모크 점검을 마친 뒤 고정한다 (지금은 미고정).
+transformers==4.44.2
+numpy
+scikit-learn
+pandas
+pillow
+huggingface_hub
+open_clip_torch
+pyarrow

@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# 비밀값 · 개인 환경 (올리지 않는다)
+.env
+.env.*
+*.key
+hf_token*
+*.token
+secrets/
+.vscode/
+.idea/
+_netrc
+
+# 실험 부산물 (wandb 기록에는 이메일 · 경로 · 호스트가 들어간다)
+wandb/
+runs_local/
+logs/
+*.log
+
+# 큰 파일은 Hugging Face Hub 에 둔다 (manifests/ 에 위치와 해시만 기록)
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.ckpt
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.faiss
+*.index
+checkpoints/
+adapters/
+
+# 이미지 · 원본 데이터셋 (라이선스 확인 전에는 올리지 않는다)
+images/
+*.jpg
+*.jpeg
+*.png
+*.zip
+
+# 저자 레포 파일 (tools/fetch_author_assets.py 로 받는다. 저자 레포에 라이선스가 없어 올리지 않는다)
+phi3/assets/
+phi35/assets/
+
+# 노트북은 출력을 지운 뒤 커밋한다. 아래는 로컬 임시 노트북
+*_local.ipynb

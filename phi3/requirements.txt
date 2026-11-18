@@ -1,0 +1,4 @@
+-r ../requirements-common.txt
+# 아래는 점검 후 고정한다 (지금은 미고정). 팀원 구현(phi3_urp)의 requirements 와 맞춘다.
+peft
+accelerate

@@ -1,0 +1,5 @@
+-r ../requirements-common.txt
+# 아래는 점검 후 고정한다 (지금은 미고정). 실행 때마다 transformers, peft, torch 버전을 결과에 기록한다.
+peft
+accelerate
+# torch 는 실행 환경(Colab) 기본값을 쓰되 버전을 기록한다
