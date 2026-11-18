@@ -2,13 +2,13 @@
 저장 위치(공유 Drive, 랩 서버 공용 폴더 등)와 무관하게 쓴다. 위치는 --where 로 라벨만 적는다.
 
 버전 고정이 없는 저장소에서도 같은 파일임을 보장하려고 아래 규칙을 쓴다.
-  1) 릴리스 폴더(예: AIMS_release/v1/<이름>)는 한 번 올리면 덮어쓰지 않는다. 바뀌면 이름에 -v2 를 붙여 새로 올린다.
+  1) 릴리스 폴더(예: AIMS_shared/checkpoints/phi35/<이름>-v1)는 한 번 올리면 덮어쓰지 않는다. 바뀌면 이름에 -v2 를 붙여 새로 올린다.
   2) 올린 폴더의 파일별 sha256 을 이 도구로 기록해 레포에 커밋한다.
   3) 받은 쪽은 복사해 온 폴더를 이 도구로 검증한 뒤 쓴다.
 
   # 기록: 릴리스 폴더(로컬 또는 마운트된 Drive 경로)를 읽어 해시를 매니페스트에 쓴다
   python tools/release_manifest.py make --name phi35-vqarad-e10-s42-v1 --path <폴더> \
-      --where "AIMS_release/v1/phi35-vqarad-e10-s42-v1" --protocol compliant --note "train만 학습, val 선택 ep6"
+      --where "AIMS_shared/checkpoints/phi35/phi35-vqarad-e10-s42-v1" --protocol compliant --note "train만 학습, val 선택 ep6"
 
   # 검증: 받은(복사한) 폴더가 매니페스트와 같은지
   python tools/release_manifest.py verify --name phi35-vqarad-e10-s42-v1 --path <받은 폴더>
@@ -101,7 +101,7 @@ def main():
     mk = sub.add_parser('make')
     mk.add_argument('--name', required=True)
     mk.add_argument('--path', required=True)
-    mk.add_argument('--where', required=True, help='공유 위치 안의 상대 경로 라벨 (개인 PC 경로 금지). 예: AIMS_release/v1/<이름>')
+    mk.add_argument('--where', required=True, help='공유 위치 안의 상대 경로 라벨 (개인 PC 경로 금지). 예: AIMS_shared/checkpoints/phi35/<이름>-v1')
     mk.add_argument('--protocol', choices=('compliant', 'relaxed'), required=True)
     mk.add_argument('--note', default='')
     mk.set_defaults(fn=cmd_make)

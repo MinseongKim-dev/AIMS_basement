@@ -1,7 +1,7 @@
 # AIMS_basement — Phi-3 / Phi-3.5V 기반 RAG · Expert-CFG 공통 레포
 
 논문 *Uncertainty-Driven Expert Control* (arXiv:2507.09209)의 Phi3V-Med / Phi3.5V-Med 재현을 팀이 함께 쓰는 레포다.
-체크포인트와 큰 파일은 여기에 올리지 않고 **공용 저장소(공유 Drive 폴더 또는 랩 서버 공용 폴더 — 아직 미정)** 에 두며, 이 레포에는 위치와 sha256(`manifests/`)만 둔다.
+체크포인트와 큰 파일은 여기에 올리지 않고 **공유 Drive 폴더 `AIMS_shared`** 에 두며, 이 레포에는 위치와 sha256(`manifests/`)만 둔다.
 
 ## 구조
 
@@ -50,7 +50,7 @@ python tools/release_manifest.py verify --name <manifests/checkpoints.json 의 �
 
 | 항목 | 상태 |
 |---|---|
-| 공용 저장 위치 | 공유 Drive 폴더 또는 랩 서버 공용 폴더 (미정). 어느 쪽이든 `manifests/` 규칙은 같다 |
+| 공용 저장 위치 | **공유 Drive 폴더 `AIMS_shared`로 정함.** 랩 서버로 옮기게 되면 위치 라벨만 바뀐다 (`manifests/` 규칙은 같다) |
 | 실행 환경 | Colab 또는 랩 GPU 서버 (미정). 서버로 가면 Colab 의존 코드(`/content/...`, `drive.mount`, `!pip`)를 걷어내고 설정 파일로 실행하는 진입점이 필요하다 |
 | 4.44.2에서 Phi-3.5V 동작 | 미검증 (`phi35/README.md`의 점검 목록) |
 | Hugging Face | 쓰지 않기로 함 (기반 모델과 공개 데이터셋 다운로드에만 사용, 로그인 불필요) |
