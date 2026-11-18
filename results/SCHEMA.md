@@ -1,6 +1,6 @@
 # 결과 기록 형식
 
-실행 하나당 `results/<날짜>_<모델>_<데이터셋>_<이름>.json` 파일 하나. 문항 단위 예측은 같은 이름의 `.jsonl`에 둔다(HF 데이터셋 레포에 올려도 된다).
+실행 하나당 `results/<날짜>_<모델>_<데이터셋>_<이름>.json` 파일 하나. 문항 단위 예측은 같은 이름의 `.jsonl`에 두고, 크면 Drive 릴리스 폴더에 둔다.
 
 ```json
 {
@@ -16,7 +16,7 @@
   "cfg": {"gamma": 1.3, "alpha": 0.01, "beta": 3.0, "delta": 3.0986},
   "kb": {"name": "peir,roco,trainqa", "variant": "_v2", "retrieval": "union"},
   "seed": 42,
-  "checkpoint": {"manifest": "phi35-vqarad-e10-s42", "revision": "<HF 커밋 해시>"},
+  "checkpoint": {"manifest": "phi35-vqarad-e10-s42-v1"},   // manifests/checkpoints.json 의 이름. sha256 은 매니페스트에 있다
   "env": {"transformers": "4.44.2", "peft": "", "torch": "", "gpu": ""},
   "note": ""
 }

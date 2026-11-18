@@ -1,7 +1,7 @@
 # AIMS_basement — Phi-3 / Phi-3.5V 기반 RAG · Expert-CFG 공통 레포
 
 논문 *Uncertainty-Driven Expert Control* (arXiv:2507.09209)의 Phi3V-Med / Phi3.5V-Med 재현을 팀이 함께 쓰는 레포다.
-체크포인트와 큰 파일은 여기에 올리지 않고 **Hugging Face Hub(비공개)** 에 두며, 이 레포에는 위치와 해시(`manifests/`)만 둔다.
+체크포인트와 큰 파일은 여기에 올리지 않고 **공유 Google Drive 폴더**에 두며, 이 레포에는 위치와 sha256(`manifests/`)만 둔다.
 
 ## 구조
 
@@ -10,9 +10,9 @@ common/            모델과 무관한 코드: 채점(vqa_scoring.py), RAG 검�
 phi3/              Phi-3-vision-128k 전용 코드·설정·requirements (비어 있음: 이식 대기)
 phi35/             Phi-3.5-vision 전용 코드·설정·requirements (비어 있음: 이식 대기)
 data_common/       팀 공통 VQA-RAD 분할 (train 2,749 / val 315 / test 451, 이미지 단위 val, 시드 42)
-manifests/         체크포인트·큰 파일의 HF 위치, 커밋 해시, sha256
+manifests/         체크포인트·큰 파일의 Drive 위치와 sha256
 results/           실행 결과 요약 (형식: results/SCHEMA.md)
-tools/             저자 파일 받기, HF 업로드·다운로드
+tools/             저자 파일 받기, Drive 릴리스 매니페스트 기록·검증
 docs/RULES.md      규칙(프로토콜 구분, 공식 채점, 작업 규칙)
 ```
 
@@ -30,7 +30,7 @@ Phi-3와 Phi-3.5V는 **폴더를 나눈다.** 모델 내부 구조(모듈 이름
 ```bash
 pip install -r requirements.txt
 python tools/fetch_author_assets.py        # 저자 레포의 processor 파일을 고정 커밋에서 받는다 (저자 레포에 라이선스가 없어 복사해 올리지 않음)
-python tools/hf_sync.py download --entry <manifests/checkpoints.json 의 이름>     # 체크포인트 받기
+python tools/drive_manifest.py verify --name <manifests/checkpoints.json 의 이름> --path <복사해 온 폴더>   # 받은 체크포인트 검증
 ```
 
 ## 꼭 지킬 것

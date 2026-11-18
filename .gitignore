@@ -11,7 +11,7 @@ venv/
 .env
 .env.*
 *.key
-hf_token*
+*_token*.txt
 *.token
 secrets/
 .vscode/
@@ -24,7 +24,7 @@ runs_local/
 logs/
 *.log
 
-# 큰 파일은 Hugging Face Hub 에 둔다 (manifests/ 에 위치와 해시만 기록)
+# 큰 파일은 공유 Drive 폴더에 둔다 (manifests/ 에 위치와 sha256 만 기록)
 *.safetensors
 *.pt
 *.pth
