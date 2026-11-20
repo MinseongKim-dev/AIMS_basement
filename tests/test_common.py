@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import gating as G          # noqa: E402
 from common import highlights as H      # noqa: E402
+from common import build_rag_testjson as B   # noqa: E402
 
 
 def test_aggregate_entropy():
@@ -42,6 +43,26 @@ def test_inject():
     assert H.inject_caption(cap, 'yes', 'CLOSED') == cap                    # closed 는 그대로
     assert H.inject_highlights('Blood vessel', 'OPEN') == ['Blood vessel']
     assert H.inject_highlights('yes', 'CLOSED', fallback=['s1']) == ['s1']
+
+
+def test_trainqa_groups():
+    items = [('a.jpg', 'pa', 'Is it CT?', 'yes'), ('a.jpg', 'pa', 'what organ?', 'lung'),
+             ('b.jpg', 'pb', 'Is there a mass?', 'no'),                     # 답이 no 인 QA 는 뺀다 → b 이미지는 항목 자체가 사라진다
+             ('c.jpg', 'pc', 'Which plane', 'axial')]
+    g = B.paper_trainqa_groups(items)
+    assert g == [('a.jpg', 'pa', 'Is it CT? yes. what organ? lung.'), ('c.jpg', 'pc', 'Which plane? axial.')], g
+
+
+def test_retrieval_modes():
+    import numpy as np
+    kb = B.KB()
+    # 항목0: train QA(이미지 특징이 쿼리와 같음, 텍스트는 직교) / 항목1: PEIR(텍스트가 쿼리와 가까움)
+    kb.add(['qa text'], 'trainqa', ['img0.jpg'], np.array([[0.0, 1.0]]), np.array([[1.0, 0.0]]))
+    kb.add(['peir text'], 'peir', ['1'], np.array([[0.8, 0.6]]))
+    kb.finalize()
+    q = np.array([1.0, 0.0]); qt = np.array([0.0, 1.0])
+    assert kb.retrieve(q, k=2, mode='cross')[0] == 1                      # 이미지→텍스트만: PEIR 가 1순위
+    assert kb.retrieve(q, k=2, qtxt=qt, mode='union')[0] == 0             # union: train QA 의 이미지↔이미지 유사도(1.0)가 이긴다
 
 
 if __name__ == '__main__':

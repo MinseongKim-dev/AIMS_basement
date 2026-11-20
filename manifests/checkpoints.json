@@ -1,1 +1,40 @@
-{}
+{
+  "phi35-slake-baseline-ckpt380-v1": {
+    "files": {
+      "test_predictions.json": "dbd6b4663f6397fa2dd007aca9468695c2d2ba2f4456202deda1b8cc5cbcd99f"
+    },
+    "note": "베이스라인 test 예측 1061문항, 제거한 필드: ['entropy']. 어댑터: phi35-slake-e5-s42-v1",
+    "protocol": "compliant",
+    "recorded": "2026-11-20",
+    "where": "AIMS_shared/baselines/phi35-slake-baseline-ckpt380-v1"
+  },
+  "phi35-slake-e5-s42-v1": {
+    "files": {
+      "adapter_config.json": "513a81474ee81e7417cac202ecc3f99d3aef80aa919626f9decc49dfc310f6c2",
+      "adapter_model.safetensors": "aad7b1b3476dc21954ab2cbd252bfd9eef84493feea8d9b4d8c136974cb149c2"
+    },
+    "note": "train만 학습, val로 고른 체크포인트(step 380). Phi-3.5V-Med LoRA 위에 이어서 학습",
+    "protocol": "compliant",
+    "recorded": "2026-11-20",
+    "where": "AIMS_shared/checkpoints/phi35/phi35-slake-e5-s42-v1"
+  },
+  "phi35-vqarad-baseline-ckpt257-v1": {
+    "files": {
+      "test_predictions.json": "6d6e8e046fe49707210133c645c39775c5c75540a82cef1cb1a1d598a153bd3e"
+    },
+    "note": "베이스라인 test 예측 451문항, 제거한 필드: ['entropy']. 어댑터: phi35-vqarad-e10-s42-v1",
+    "protocol": "compliant",
+    "recorded": "2026-11-20",
+    "where": "AIMS_shared/baselines/phi35-vqarad-baseline-ckpt257-v1"
+  },
+  "phi35-vqarad-e10-s42-v1": {
+    "files": {
+      "adapter_config.json": "ecfbb99d3c2dcf1603b6cbe8a4a78c88f9bb3b67a6bf7892ef9e9e911ba30a91",
+      "adapter_model.safetensors": "b2774ecf520095bd4fc7ed21938efb8f5ef7c87d1f78489b1d9d5168d3e45de6"
+    },
+    "note": "train만 학습, val로 고른 체크포인트(step 257). Phi-3.5V-Med LoRA 위에 이어서 학습",
+    "protocol": "compliant",
+    "recorded": "2026-11-20",
+    "where": "AIMS_shared/checkpoints/phi35/phi35-vqarad-e10-s42-v1"
+  }
+}

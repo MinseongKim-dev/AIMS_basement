@@ -9,11 +9,12 @@
 common/            모델과 무관한 코드: 채점(vqa_scoring.py), RAG 검색 파일 생성(build_rag_testjson.py)
 phi3/              Phi-3-vision-128k 전용 코드·설정·requirements (비어 있음: 이식 대기)
 phi35/             Phi-3.5-vision 전용 코드·설정·requirements (비어 있음: 이식 대기)
-data_common/       팀 공통 VQA-RAD 분할 (train 2,749 / val 315 / test 451, 이미지 단위 val, 시드 42)
+data_common/       팀 공통 VQA-RAD 분할 vqarad_img/ (train 2,749 / val 315 / test 451, 이미지 단위 val, 시드 42). 이 JSON과 VQA-RAD 이미지 폴더만 있으면 되고 원본 VQA-RAD JSON은 필요 없다
 manifests/         체크포인트·큰 파일의 위치 라벨과 sha256
 results/           실행 결과 요약 (형식: results/SCHEMA.md)
 tools/             저자 파일 받기, 릴리스 매니페스트 기록·검증
 docs/RULES.md      규칙(프로토콜 구분, 공식 채점, 작업 규칙)
+docs/UNCERTAINTY_SPEC.md  불확실성(엔트로피) 계산 명세와 출력 형식 (Phi-3.5V 먼저, 팀원 담당)
 ```
 
 Phi-3와 Phi-3.5V는 **폴더를 나눈다.** 모델 내부 구조(모듈 이름, 마스크 처리)에 의존하는 CFG 훅이 모델마다 다르기 때문이다.

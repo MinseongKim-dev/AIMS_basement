@@ -1,21 +1,23 @@
 """RAG 용 test 파일 만들기 — VQA-RAD 와 SLAKE 에 같은 파이프라인, 지식베이스(KB)를 선택한다.
 
-KB 구성 (--kb, 쉼표 구분):
-  peir     PEIR 캡션 33,572 (PEIR_openai_imgid2caption.json)
-  roco     ROCO 캡션 (HF eltorio/ROCO-radiology, train; 캡션 열만 읽는다)
-  trainqa  VQA-RAD · SLAKE 의 **train** QA 를 텍스트로 바꾼 것 ("{질문} {정답}"). val / test 는 쓰지 않는다.
-논문의 KB 는 ROCO 70,306 + PEIR 33,572 + 세 데이터셋 train QA(캡션으로 바꾼 것)다. 우리는 PathVQA 가 없고, ROCO 는 공개본(train 65,423)이며,
-train QA → 캡션 변환은 논문이 방식을 밝히지 않아 단순 연결 템플릿이다. 결과표에는 "자체 검색 + KB 구성"으로 표기한다.
+KB 구성 (--kb, 쉼표 구분, 기본 peir,roco,trainqa):
+  peir     PEIR 캡션 33,572 (PEIR_openai_imgid2caption.json, 저자 배포본 — 이 레포에 없음)
+  roco     ROCO 캡션 (HF eltorio/ROCO-radiology, train; 캡션 열만 읽는다. 공개본 65,423 중 65,422 사용)
+  trainqa  VQA-RAD · SLAKE 의 **train** QA. 같은 이미지의 QA 를 한 항목으로 합치고 답이 'no' 인 QA 는 뺀다.
+           문장은 "질문? 답." 형식(팀원 phi3_urp 의 qa_sentence 와 같음). val / test 는 쓰지 않는다.
+논문의 KB 는 ROCO 70,306 + PEIR 33,572 + 세 데이터셋 train QA(GPT-4 로 문장화)다. 우리는 PathVQA 가 없고, ROCO 는 공개본이며,
+문장화는 GPT-4 대신 위 템플릿이다. 결과표에는 "자체 검색 + KB 구성"으로 표기한다.
 
-검색: 질문 이미지를 BioMedCLIP 으로 인코딩하고 KB 텍스트 피처와 코사인 유사도 top-k (이미지 쿼리 × 텍스트 KB).
-하이라이트(정답 미사용): PEIR 항목은 PEIR match_keyword, 그 외 항목은 "검색된 캡션과 질문이 공유하는 1~3-gram"(논문의 closed 규칙을 단순화한 것).
-누수 점검: KB 에 train QA 를 넣으면 같은 이미지의 train QA 가 검색될 수 있다(VQA-RAD 는 train / test 이미지가 많이 겹친다).
-top-1 이 같은 이미지의 train QA 인 비율을 보고한다.
+검색 (--retrieval):
+  union  (train QA 가 있으면 기본) max(이미지 유사도, 질문 텍스트 유사도). 이미지 유사도는 trainqa 항목이면 이미지↔이미지, PEIR · ROCO 면 이미지→텍스트.
+  cross  이미지 쿼리 x KB 텍스트만 (train QA 가 없으면 기본).
+하이라이트(정답 미사용): PEIR 항목은 PEIR match_keyword, 그 외 항목은 "검색된 캡션과 질문이 공유하는 1~3-gram".
+누수 점검: 같은 이미지의 train QA 가 top-1 로 검색될 수 있다(VQA-RAD 는 train / test 이미지가 많이 겹침). top-1 출처 비율과 같은 이미지 비율을 보고한다.
 
+입력: 공통 분할 JSON(레포의 data_common/vqarad_img/{trainset,testset}.json)과 VQA-RAD 이미지 폴더. 원본 VQA-RAD JSON 은 필요 없다.
 실행 (Colab, GPU):
-  python -u tools/build_rag_testjson.py --peir_dir <PEIR 폴더> --vqarad_common <testset.json> --vqarad_train <trainset.json> \
-      --vqarad_img <VQA-RAD 이미지 폴더> --out_dir <출력 폴더> --kb peir,roco,trainqa
-출력: rag_{vqarad,slake}[_<kb>].json (kb 가 peir 뿐이면 접미어 없음), rag_meta[_<kb>].json, 텍스트 피처 캐시(.npy)
+  python -u common/build_rag_testjson.py --peir_dir <PEIR 폴더> --vqarad_common data_common/vqarad_img/testset.json       --vqarad_train data_common/vqarad_img/trainset.json --vqarad_img <VQA-RAD 이미지 폴더> --out_dir <출력 폴더> --out_suffix _v2
+출력: rag_{vqarad,slake}_<kb>[<접미어>].json, rag_meta_<kb>[<접미어>].json, 텍스트 피처 캐시(.npy)
 """
 import argparse
 import json
@@ -254,12 +256,12 @@ def main():
     ap.add_argument('--vqarad_train', default=None, help='공통 split trainset.json (kb 에 trainqa 가 있으면 필수)')
     ap.add_argument('--vqarad_img', required=True)
     ap.add_argument('--out_dir', required=True)
-    ap.add_argument('--kb', default='peir', help='peir, roco, trainqa 의 쉼표 조합')
+    ap.add_argument('--kb', default='peir,roco,trainqa', help='peir, roco, trainqa 의 쉼표 조합')
     ap.add_argument('--roco_split', default='train')
-    ap.add_argument('--trainqa', choices=('pair', 'paper'), default='pair',
-                    help="pair: QA 한 쌍씩 '질문 답' (기존) / paper: 이미지별로 합치고 'no' 답 제외, '질문? 답.' 형식 (논문 · 팀원 방식)")
-    ap.add_argument('--retrieval', choices=('cross', 'union'), default='cross',
-                    help='cross: 이미지 쿼리 x 텍스트 (기존) / union: max(이미지 유사도, 질문 텍스트 유사도) (팀원 방식). union 은 trainqa 항목의 이미지를 인코딩한다')
+    ap.add_argument('--trainqa', choices=('paper',), default='paper',
+                    help="train QA 형식. 이미지별로 합치고 'no' 답 제외, '질문? 답.' (논문 · 팀원 방식)만 지원한다. 옛 방식(pair)은 제거했다. 기존 명령과 호환하려고 받기만 한다")
+    ap.add_argument('--retrieval', choices=('cross', 'union'), default=None,
+                    help='cross: 이미지 쿼리 x 텍스트 / union: max(이미지 유사도, 질문 텍스트 유사도). 기본: trainqa 가 KB 에 있으면 union, 없으면 cross')
     ap.add_argument('--out_suffix', default='', help='출력 파일 이름 접미어 (예: _v2). 기존 결과 파일을 덮어쓰지 않기 위함')
     ap.add_argument('--slake_img', default='/content/slake_data/imgs', help='SLAKE train 이미지 폴더 (trainqa=paper 에서 이미지 피처에 필요)')
     a = ap.parse_args()
@@ -267,8 +269,11 @@ def main():
     assert kbs and set(kbs) <= {'peir', 'roco', 'trainqa'}, kbs
     tag = '_'.join(kbs)
     suffix = ('' if kbs == ['peir'] else f'_{tag}') + a.out_suffix
+    if a.retrieval is None:
+        a.retrieval = 'union' if 'trainqa' in kbs else 'cross'
     if a.retrieval == 'union':
-        assert 'trainqa' in kbs and a.trainqa == 'paper', 'union 검색은 이미지가 있는 trainqa=paper 항목이 있어야 의미가 있습니다'
+        assert 'trainqa' in kbs, 'union 검색은 이미지가 있는 trainqa 항목이 있어야 의미가 있습니다 (--kb 에 trainqa 를 넣거나 --retrieval cross)'
+    print(f'KB {kbs} | 검색 {a.retrieval}')
 
     enc = Encoder()
     kb = KB()
@@ -290,18 +295,12 @@ def main():
         kb.add(caps, 'roco', [None] * len(caps), F); counts['roco'] = len(caps)
     if 'trainqa' in kbs:
         assert a.vqarad_train, '--vqarad_train 이 필요합니다'
-        if a.trainqa == 'paper':
-            items = [(r['image_name'], os.path.join(a.vqarad_img, r['image_name']), r['question'], r['answer']) for r in load_vqarad(a.vqarad_train)]
-            items += [(r['img_name'], os.path.join(a.slake_img, r['img_name']), r['question'], r['answer']) for r in slake_split('train')]
-            groups = paper_trainqa_groups(items)
-            texts = [t for _, _, t in groups]
-            imf = enc.images([pth for _, pth, _ in groups]) if a.retrieval == 'union' else None
-            kb.add(texts, 'trainqa', [n for n, _, _ in groups], enc.text(texts), imf); counts['trainqa'] = len(texts)
-        else:
-            qa = [(r['image_name'], f"{str(r['question']).strip()} {str(r['answer']).strip()}") for r in load_vqarad(a.vqarad_train)]
-            qa += [(r['img_name'], f"{str(r['question']).strip()} {str(r['answer']).strip()}") for r in slake_split('train')]
-            texts = [t for _, t in qa]
-            kb.add(texts, 'trainqa', [i for i, _ in qa], enc.text(texts)); counts['trainqa'] = len(texts)
+        items = [(r['image_name'], os.path.join(a.vqarad_img, r['image_name']), r['question'], r['answer']) for r in load_vqarad(a.vqarad_train)]
+        items += [(r['img_name'], os.path.join(a.slake_img, r['img_name']), r['question'], r['answer']) for r in slake_split('train')]
+        groups = paper_trainqa_groups(items)
+        texts = [t for _, _, t in groups]
+        imf = enc.images([pth for _, pth, _ in groups]) if a.retrieval == 'union' else None
+        kb.add(texts, 'trainqa', [n for n, _, _ in groups], enc.text(texts), imf); counts['trainqa'] = len(texts)
     kb.finalize()
     print('KB 구성:', counts, '| 합계', len(kb.texts))
 
@@ -312,7 +311,7 @@ def main():
     meta = {'encoder': MID, 'top_k': TOP_K, 'kb': kbs, 'kb_counts': counts,
             'method': '이미지 직접 인코딩 x KB 텍스트 인코딩, 코사인 top-k (자체 검색)' if a.retrieval == 'cross'
                       else 'union = max(이미지 유사도, 질문 텍스트 유사도), 이미지 유사도는 trainqa 항목만 이미지↔이미지 (팀원 phi3_urp 방식 해석)',
-            'trainqa_style': a.trainqa, 'retrieval': a.retrieval}
+            'trainqa_style': 'paper', 'retrieval': a.retrieval}
     sl_rows, sl_img = slake_test_rows()
     for name, rows, img_root in (('vqarad', vqarad_test_rows(a.vqarad_common), a.vqarad_img), ('slake', sl_rows, sl_img)):
         qtxts = enc.text([str(r['question']) for r in rows]) if a.retrieval == 'union' else None
