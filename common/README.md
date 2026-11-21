@@ -8,4 +8,7 @@
   - 알려진 한계: union에서는 train QA 항목이 항상 top-1이 되어 PEIR · ROCO가 쓰이지 않는다(VQA-RAD 100%, SLAKE 99.9%). VQA-RAD는 top-1의 90%가 같은 이미지의 train QA다.
   - 입력 파일(PEIR 캡션, 키워드)은 저자 배포본이며 이 레포에 없다.
 
-두 파일은 `Expert-CFG` 레포에서 가져왔고 거기서 계속 수정되고 있다. 이 레포로 옮긴 뒤에는 이 레포가 기준이다.
+- `highlights.py` : 하이라이트와 정답 주입 규칙. **주의:** `inject_highlights(answer, answer_type, fallback)`는 closed의 하이라이트로 `fallback`(질문과 겹치는 캡션 문장, 팀원 규칙)을 쓰는데, Expert-CFG 레포의 02 노트북은 정답 주입 행의 closed에 검색 파일의 n-gram 하이라이트를 쓴다. 두 구현이 다르고, 정답 주입 행의 closed 점수에 영향을 줄 수 있다(검증 안 함). 02의 결과를 이 모듈로 옮길 때 하나로 정한다.
+- `gating.py` : 불확실성 집계(식 4), 상위 5% 선택(동점이면 번호가 작은 문항), AUC.
+
+두 파일(`vqa_scoring.py`, `build_rag_testjson.py`)은 `Expert-CFG` 레포에서 가져왔고 거기서 계속 수정되고 있다. 이 레포로 옮긴 뒤에는 이 레포가 기준이다.
