@@ -1,0 +1,56 @@
+# 팀원 코드(phi3_urp)를 가져온 기록
+
+| 항목 | 내용 |
+|---|---|
+| 출처 | `https://github.com/each-yi/phi3_urp` |
+| 커밋 | `97fdb48` ("최종", 2026-11-22). 처음 가져온 것은 `cab1984` |
+| 가져온 날 | 2026-11-22 (cab1984), 2026-11-23 (97fdb48로 동기화) |
+| 수정 | **아직 없음** (원본과 바이트 동일, 해시는 `UPSTREAM.sha256`) |
+
+## 가져온 것과 가져오지 않은 것
+
+| 가져옴 | 위치 |
+|---|---|
+| 패키지 `phi3cfg/` (`generation.py` 논문 식 4 · 7~10, `retrieval.py` KB · union 검색 · 전문가 주석, `train.py`, `infer.py`, `evaluate.py`, 데이터 준비 모듈 등 11개) | `phi3/phi3cfg/` |
+| CPU 테스트 (`test_logic.py`, `cpu_smoke.py`) | `phi3/tests/` |
+| 팀 프로토콜 학습 · val 선택 · test 베이스라인 노트북 (출력 없음) | `phi3/Phi3V_teamproto_colab.ipynb` |
+| **A100 전용 논문 재현 베이스라인 노트북** (출력 없음) | `phi3/Phi3V_baseline_A100.ipynb` |
+| 원본 README | `phi3/UPSTREAM_README.md` |
+
+| 가져오지 않음 | 이유 |
+|---|---|
+| `phi3cfg/__pycache__/*.pyc` | 원본이 추적 중인 캐시 파일 |
+| `Phi3V_baseline_colab.ipynb`, `Phi3V_resume_colab.ipynb` | 옛 T4 기준 노트북이고 실행 출력이 들어 있음 |
+| `2507.09209v1.pdf` | 논문 PDF(5.7MB). 저작물이라 복사하지 않음. arXiv에서 받는다 |
+| `requirements.txt` | 복사하지 않고 `phi3/requirements.txt`에 **내용을 따라 새로 썼다**(팀원 파일 기준, `bitsandbytes==0.44.1` 한 줄만 주석 처리) |
+| `run_phi3.sh` | 쓰지 않음 |
+
+## 규칙
+
+1. **이 복사본에서 수정하고, 팀원 저장소에는 커밋하지 않는다.**
+2. 수정할 때마다 아래 "수정 이력"에 파일, 이유, 날짜를 적고 `UPSTREAM.sha256`은 **원본 해시로 남겨 둔다**(원본과 비교하는 기준이므로 갱신하지 않는다). 수정 여부는 `sha256sum -c UPSTREAM.sha256`로 확인한다.
+3. 원본이 바뀌어도 자동으로 반영되지 않는다. 새 커밋을 가져오려면 파일을 비교해서 직접 합치고 이 문서의 커밋과 날짜를 갱신한다.
+4. 두 노트북(`Phi3V_teamproto_colab.ipynb`, `Phi3V_baseline_A100.ipynb`)은 같은 코드를 `%%writefile`로 내장한다. `teamproto`의 내장본은 cab1984의 `phi3cfg/`와 동일함을 확인했고, **97fdb48에서 바뀐 `train.py`(아래 이력)는 반영되어 있지 않다**(기본값이 같아 동작은 같다). **코드를 수정하면 노트북 내장본과 어긋난다.** 수정한 코드로 학습하려면 노트북을 다시 만들거나 수정본을 Drive에서 복사해 쓴다.
+
+## 라이선스와 동의
+
+- 원본 저장소에 LICENSE 파일이 없어 재배포 권한이 명시되어 있지 않다. 이 레포는 **비공개 팀 저장소**이고 공개하지 않는다.
+- 이 폴더의 기존 방침(`phi3/README.md`)은 "옮길 때 팀원의 동의를 받는다"였다. **복사에 대한 팀원의 동의는 확인하지 못했다.** 확인되면 여기에 날짜를 적는다: 동의 확인일 ____
+
+## Colab에서 쓰는 법과 남은 문제
+
+이 레포는 비공개라 Colab에서 바로 clone할 수 없다(토큰을 요구하지 않는다).
+- **학습 · 베이스라인**: `Phi3V_teamproto_colab.ipynb`가 코드를 내장하므로 이 노트북을 그대로 열어 실행한다.
+- **RAG · CFG 단계**: `run_teammate_stage.ipynb`는 지금 팀원 공개 저장소를 고정 커밋으로 clone한다(수정 없는 원본). **수정한 코드를 쓰려면** `phi3/phi3cfg/`를 Drive의 공유 폴더(`AIMS_shared/code/...`, 릴리스 규칙과 해시 기록 적용)에 올리고 노트북이 거기서 복사하도록 바꿔야 한다. 아직 하지 않았다.
+
+## 수정 이력
+
+| 날짜 | 파일 | 내용 | 이유 |
+|---|---|---|---|
+| 2026-11-23 | `Phi3V_team_A100.ipynb` (**새 파일**, 팀원 `Phi3V_baseline_A100.ipynb` 파생) | VQA-RAD를 팀 공통 분할(`vqarad_common`)로, epoch를 VQA-RAD 10 / SLAKE 5로, 체크포인트를 `--save-epochs`(2·4·6·8·10 / 1~5)로, val 선택 동점을 이른 epoch로, 결과 위치를 `phi3_team_a100`으로 바꾸고 `run_teammate_stage.ipynb`가 읽는 `selected.json` · `test_ckpt<step>.jsonl`을 만드는 함수를 추가. 팀원 코드(`phi3cfg/`)는 수정하지 않음 | 팀원이 A100 노트북으로 실행하라고 했고, 우리 팀 Phi-3.5V와 같은 프로토콜로 비교하려면 데이터와 선택 규칙이 같아야 함 |
+
+### 원본의 변경 (우리 수정 아님)
+
+| 커밋 | 내용 |
+|---|---|
+| `cab1984` → `97fdb48` | `phi3cfg/train.py`: `--warmup-ratio`(0.03), `--weight-decay`(0.0), `--max-grad-norm`(1.0) 인자 추가. 기본값은 이전 하드코딩과 같아 기본 동작은 같다. `Phi3V_baseline_A100.ipynb` 추가(공개 어댑터의 `training_args.bin`에서 값을 읽어 넘김). README 갱신. 논문 PDF 추가(복사 안 함) |

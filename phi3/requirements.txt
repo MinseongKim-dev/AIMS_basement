@@ -1,2 +1,20 @@
--r ../requirements.txt
-# Phi-3-vision-128k: 팀원 구현(phi3_urp)이 이 조합(transformers 4.44.2, eager attention)에서 실행한 것을 기준으로 한다.
+# Phi-3-vision-128k 환경. 팀원 저장소(each-yi/phi3_urp@97fdb48)의 requirements.txt 를 따른다. 다른 점은 bitsandbytes 한 줄뿐이다.
+# torch / torchvision 은 Colab 기본값을 쓰고, 실행 때마다 버전을 결과에 기록한다 (팀원 파일의 방침과 같음).
+# attention 은 eager 이다: CFG 가 4D attention mask 에 bias 를 더하므로 flash-attention 은 이를 무시한다.
+transformers==4.44.2
+peft==0.12.0
+accelerate==0.34.2
+# bitsandbytes==0.44.1   <- 팀원 파일에는 있다. 4bit(NF4) 학습에만 필요하고 bf16/fp16 학습 · 추론에는 쓰이지 않는다.
+#   최신 Colab(torch 2.11 / triton 3.6)에서는 이 버전이 triton.ops 를 import 하다가 peft 로드를 깨뜨린다(Phi-3.5V 점검에서 재현). 그래서 주석 처리했다.
+#   4bit 가 필요하면 최신(>=0.45)을 따로 설치한다.
+huggingface-hub==0.25.2
+datasets==2.21.0
+open_clip_torch==2.26.1
+Pillow
+numpy<2
+scikit-learn
+scipy
+# optional: openai  (only for --llm caption/highlight generation, Fig. 7-9)
+#
+# Python 3.13 Colab: transformers 4.44.2 가 요구하는 tokenizers 0.19 에 3.13용 wheel 이 없다. 팀원 A100 노트북(Phi3V_baseline_A100.ipynb)과 이를 바탕으로 한
+# Phi3V_team_A100.ipynb 의 환경 셀이 이를 처리한다(transformers · peft 는 --no-deps 로 고정, tokenizers 0.20 사용). 3.12 에서는 위 파일만으로 된다.
