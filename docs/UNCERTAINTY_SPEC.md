@@ -28,7 +28,7 @@ RAG · Expert-CFG의 5% 게이팅은 베이스라인 예측의 **엔트로피 �
 | **이미지 크롭 수** | **`num_crops=16`** (`AutoProcessor.from_pretrained(..., trust_remote_code=True, num_crops=16)`). 기본값과 다를 수 있으니 반드시 지정한다. 다르면 같은 답에 대해 다른 이미지 토큰으로 엔트로피를 구하게 된다 |
 | 프롬프트 | `tok.apply_chat_template([{'role':'user','content': "<|image_1|>\n{질문}"}], tokenize=False, add_generation_prompt=True)`. 시스템 문구와 캡션 없음 |
 | 디코딩(예측을 만들 때) | greedy, `max_new_tokens=64` |
-| processor | 저자 `processing_phi3_v_cfg.py`를 `tools/fetch_author_assets.py`로 받아 쓴 환경에서 예측을 재현했다(50/50). HF 기본 processor가 같은 이미지 토큰을 만드는지는 **확인하지 않았으니**, 같은 결과가 필요하면 저자 processor를 쓴다 |
+| processor | 저자 `processing_phi3_v_cfg.py`를 `tools/fetch_author_assets.py`로 받아 쓴 환경에서 저장된 예측을 재현했다(VQA-RAD 444/451, SLAKE 1054/1061 일치). HF 기본 processor가 같은 이미지 토큰을 만드는지는 **확인하지 않았으니**, 같은 결과가 필요하면 저자 processor를 쓴다 |
 
 환경: `requirements.txt` (transformers 4.44.2, peft 0.12.0, accelerate 0.34.2 …). Colab Python 3.12 / torch 2.11에서 검증했다.
 **bitsandbytes는 설치하지 않는다.** 0.44.1은 이 환경의 triton에 없는 `triton.ops`를 import해서 LoRA를 만들 때 실패한다. 설치돼 있으면 `pip uninstall -y bitsandbytes` 후 런타임을 재시작한다.
@@ -76,7 +76,7 @@ RAG · Expert-CFG의 5% 게이팅은 베이스라인 예측의 **엔트로피 �
 
 ## 7. 올리기 전 점검
 
-1. 예측 재현: 50문항을 greedy로 생성해 저장된 예측과 같은지 본다(`phi35/smoke_check.ipynb`의 4번 셀 방식, 50/50이어야 한다).
+1. 예측 재현: 문항을 greedy로 생성해 저장된 예측과 비교한다(`phi35/smoke_check.ipynb`의 4번 셀 방식). **100% 일치를 기대하지 않는다.** 같은 환경(transformers 4.44.2, eager, torch 2.11)에서도 VQA-RAD는 451문항 중 7개(98.4%), SLAKE는 1061문항 중 7개(99.3%)가 달랐고(bf16 수치 차이로 보이는 근소한 문항, 점수 영향은 −0.52 / +0.22%p), 그래서 50문항 점검에서는 불일치가 0~2개 나올 수 있다. 불일치율이 약 2%를 크게 넘으면 위 2번 표(특히 `num_crops`, attention 구현)부터 의심한다.
 2. 짝짓기 assert를 전 문항에서 통과한다.
 3. 엔트로피 분포가 비정상이 아닌지 본다: `null` 개수, 음수 없음, 최댓값.
 4. 우리 쪽 참고값과 비교한다. VQA-RAD에 대해 02 노트북이 계산한 식 4 값이 있고, **선택된 상위 23문항이 거의 겹쳐야 한다**(정확한 일치 여부는 토큰화 차이 때문에 장담하지 못한다). 겹침이 크게 낮으면 위 2번 표(특히 `num_crops`)부터 의심한다. 참고값이 필요하면 알려 달라.

@@ -23,7 +23,7 @@ Phi-3와 Phi-3.5V는 **폴더를 나눈다.** 모델 내부 구조(모듈 이름
 ## 환경
 
 - `transformers==4.44.2` 로 고정한다 (팀 결정). 나머지 패키지는 Phi-3.5V 스모크 점검을 마친 뒤 고정한다 → 각 폴더의 `requirements.txt`.
-- Phi-3.5V는 4.44.2에서 스모크 점검을 통과했다 (VQA-RAD ckpt-257과 SLAKE ckpt-380 모두: 저장된 베이스라인 50/50 일치, 중립 CFG = 일반 생성 5/5, KV 캐시 3/3). 환경은 Colab Python 3.12 / torch 2.11이다. **전체 문항 재현은 아직** 확인하지 않았으니 결과표에 환경 버전을 같이 적는다.
+- Phi-3.5V는 4.44.2에서 **전 문항 점검을 통과**했다 (VQA-RAD ckpt-257 451문항, SLAKE ckpt-380 1061문항, Colab Python 3.12 / torch 2.11 / eager). KV 캐시 유무 디코딩 20/20 일치(두 데이터셋), 중립 CFG = 일반 생성 5/5, 논문 설정 CFG는 하이라이트 위치에서 logits이 바뀐다. 저장된 베이스라인 예측 재현은 VQA-RAD 444/451(98.4%), SLAKE 1054/1061(99.3%)로 **bit 단위 일치는 아니다**: 불일치 7문항씩이고 점수 영향은 VQA-RAD −0.52%p, SLAKE +0.22%p다 (방향이 일정하지 않아 수치 흔들림으로 보이며, 원인은 확정하지 못했다. 가설: 저장된 예측은 `ATTN_IMPL='sdpa'`(불가하면 eager)와 torch 2.3 계열, 점검은 eager와 torch 2.11). **RAG · CFG 점수를 4.44.2에서 재현한 것은 아니다.** 결과표에 환경 버전을 같이 적는다.
 - attention은 eager. CFG가 4D attention mask에 bias를 더하기 때문이며 flash-attention은 bias를 무시한다.
 
 ## 시작하기
