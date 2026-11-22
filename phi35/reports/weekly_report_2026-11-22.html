@@ -1,0 +1,354 @@
+<title>RAG·CFG 주간 보고</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 레이아웃: 한 줄 폭 문서. 상단에 요약, 이어서 표 중심의 본문. 표는 폭이 넘치면 자체 가로 스크롤. */
+:root {
+  --bg: #f4f6f9; --surface: #ffffff; --fg: #1a2230; --muted: #566175; --line: #d9dee7; --soft: #eef1f6;
+  --accent: #1d5f8f; --ok: #1b7a50; --ok-bg: #e3f3eb; --warn: #9a5508; --warn-bg: #fbeedb;
+  --bad: #a3322b; --bad-bg: #f9e3e1; --bar-paper: #98a2b3; --bar-ours: #1d5f8f; --bar-relaxed: #c47f1a;
+  --font: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10151c; --surface: #171e28; --fg: #e5e9f0; --muted: #9ba6b8; --line: #2a3442; --soft: #1d2531;
+    --accent: #72b3e3; --ok: #5ec794; --ok-bg: #173226; --warn: #e6a65b; --warn-bg: #3a2a14;
+    --bad: #ef8a82; --bad-bg: #3b1f1d; --bar-paper: #5b6678; --bar-ours: #72b3e3; --bar-relaxed: #e0a24f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10151c; --surface: #171e28; --fg: #e5e9f0; --muted: #9ba6b8; --line: #2a3442; --soft: #1d2531;
+  --accent: #72b3e3; --ok: #5ec794; --ok-bg: #173226; --warn: #e6a65b; --warn-bg: #3a2a14;
+  --bad: #ef8a82; --bad-bg: #3b1f1d; --bar-paper: #5b6678; --bar-ours: #72b3e3; --bar-relaxed: #e0a24f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.7;
+  padding-block: 40px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.page { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 44px; min-width: 0; }
+header .eyebrow { font-size: 13px; color: var(--muted); letter-spacing: .04em; margin: 0 0 8px; }
+h1 { font-size: clamp(26px, 5vw, 34px); line-height: 1.3; margin: 0 0 14px; font-weight: 700; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 68ch; }
+h2 { font-size: 21px; margin: 0 0 14px; font-weight: 700; text-wrap: balance; }
+h3 { font-size: 16px; margin: 22px 0 8px; font-weight: 600; }
+p { margin: 0 0 10px; max-width: 72ch; }
+section { min-width: 0; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--mono); font-size: .9em; background: var(--soft); padding: 1px 5px; border-radius: 4px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; margin-top: 18px; }
+nav.toc a { text-decoration: none; color: var(--muted); border-bottom: 1px solid var(--line); }
+nav.toc a:hover { color: var(--accent); border-color: var(--accent); }
+
+.summary { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; }
+.summary ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
+.summary li::marker { color: var(--muted); font-weight: 600; }
+
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; font-size: 12.5px; color: var(--muted); background: var(--soft); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.n, th.n { text-align: right; white-space: nowrap; }
+tr.group td { background: var(--soft); font-weight: 600; font-size: 12.5px; color: var(--muted); }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.tag.ok { color: var(--ok); background: var(--ok-bg); }
+.tag.warn { color: var(--warn); background: var(--warn-bg); }
+.tag.bad { color: var(--bad); background: var(--bad-bg); }
+.note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+.callout { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px 18px; margin-top: 14px; }
+.callout.warn { border-color: var(--warn); }
+.callout strong.t { display: block; margin-bottom: 4px; }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; min-width: 0; }
+.chart h3 { margin: 0 0 4px; }
+.chart .sub { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; }
+.row { display: grid; grid-template-columns: minmax(96px, 150px) 1fr; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px dashed var(--line); }
+.row:first-of-type { border-top: 0; }
+.row .lab { font-size: 13px; line-height: 1.35; }
+.bars { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bar { display: flex; align-items: center; gap: 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.bar .track { flex: 1; height: 10px; background: var(--soft); border-radius: 2px; position: relative; min-width: 0; }
+.bar .fill { position: absolute; inset: 0 auto 0 0; border-radius: 2px; }
+.bar .val { width: 46px; text-align: right; color: var(--muted); }
+.fill.paper { background: var(--bar-paper); } .fill.ours { background: var(--bar-ours); } .fill.relaxed { background: var(--bar-relaxed); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+ul.tight { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.tree { font-family: var(--mono); font-size: 13px; line-height: 1.6; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; overflow-x: auto; white-space: pre; margin: 0; }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (max-width: 520px) { body { font-size: 14.5px; } .row { grid-template-columns: 1fr; gap: 4px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="page">
+<header>
+  <p class="eyebrow">2026-11-22 · 지난 미팅 이후</p>
+  <h1>Phi 기반 RAG · Expert-CFG 재현, 이번 주 결과</h1>
+  <p class="lede">Phi-3.5V에서 논문 수식 정의로 통일한 RAG와 Expert-CFG를 VQA-RAD와 SLAKE에 처음으로 끝까지 실행했습니다. 이번 주 결과, 논문과의 격차에 대한 분석, 그리고 팀이 함께 쓰는 환경 · 저장소 · 공유 폴더 정리를 담았습니다. Phi-3 쪽은 팀원 담당이며 이번 주 우리 쪽 실행 결과는 없습니다.</p>
+  <nav class="toc" aria-label="목차">
+    <a href="#s-summary">요약</a><a href="#s-done">한 일</a><a href="#s-setup">설정</a><a href="#s-results">결과</a><a href="#s-analysis">분석</a><a href="#s-paper">논문 대조</a><a href="#s-env">환경 점검</a><a href="#s-shared">공용 정리</a><a href="#s-limits">한계</a><a href="#s-next">다음 주</a>
+  </nav>
+</header>
+
+<section id="s-summary">
+  <h2>요약</h2>
+  <div class="summary">
+    <ol>
+      <li><strong>구현을 논문 수식에 맞춰 통일했습니다.</strong> 엔트로피(식 4), 하이라이트 임베딩 ×α(식 7), attention 가중 +log β / −δ(식 9·10)를 팀원 구현과 같은 정의로 맞췄고, 두 데이터셋에서 한 번씩 실행했습니다.</li>
+      <li><strong>논문 방식(전문가 주석 = 정답) Expert-RAG는 논문 수준입니다.</strong> 베이스라인 대비 VQA-RAD +1.39 (논문 +1.33), SLAKE +1.01 (논문 +0.85). 정답이 입력에 들어가므로 <span class="tag warn">규칙 완화</span>로 표기하는 상한선입니다.</li>
+      <li><strong>격차는 CFG 단계에서 납니다.</strong> Expert-RAG에서 Expert-CFG로 가는 증분이 VQA-RAD +0.46 (논문 +1.33), SLAKE +0.31 (논문 +1.70)로 논문의 약 1/3~1/5입니다. 원인은 아직 확정하지 못했습니다.</li>
+      <li><strong>정답을 쓰지 않는 규칙 준수 Expert-CFG는 개선이 확인되지 않았습니다.</strong> VQA-RAD +0.44, SLAKE +0.77 (95% 구간 [−0.20, +1.74])로 논문의 +2.66 / +2.55에 못 미치고 구간이 0을 포함합니다.</li>
+      <li><strong>공용 환경을 transformers 4.44.2로 고정했고 Phi-3.5V를 두 데이터셋 전 문항으로 점검했습니다.</strong> KV 캐시와 CFG 훅은 통과했고, 저장된 베이스라인 예측은 98.4% / 99.3% 일치합니다. 공용 레포(AIMS_basement)와 공유 폴더(AIMS_shared)를 만들었습니다.</li>
+    </ol>
+  </div>
+</section>
+
+<section id="s-done">
+  <h2>이번 주 한 일</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>항목</th><th>내용</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr><td>RAG · CFG 통일 구현</td><td>논문 식 4 · 7 · 9 · 10 정의로 02 노트북 재구성(팀원 구현과 같은 정의). 5% 게이팅, γ = 1.3과 1.5 병행</td><td><span class="tag ok">완료</span></td></tr>
+      <tr><td>검색 지식베이스 v2</td><td>PEIR + ROCO + train QA(이미지별로 합침, 답이 <code>no</code>인 QA 제외), union 검색</td><td><span class="tag ok">완료</span></td></tr>
+      <tr><td>VQA-RAD · SLAKE 실행</td><td>베이스라인 / w/ RAG / 5% RAG / 5% Expert-CFG / 정답 주입 행, 공식 채점과 문항 쌍 부트스트랩 구간</td><td><span class="tag ok">완료</span> <span class="note">(SLAKE 게이팅 정의 기록 없음)</span></td></tr>
+      <tr><td>진단</td><td>SLAKE w/ RAG 분해, 불확실성 AUC, 단계별 증분 분해</td><td><span class="tag ok">완료</span></td></tr>
+      <tr><td>VQA-RAD w/ RAG 진단</td><td>같은 이미지의 train QA가 점수에 미친 영향</td><td><span class="tag warn">출력 미확인</span></td></tr>
+      <tr><td>논문 원문 대조</td><td>γ, 하이라이트, KB 규모, 쿼리 종류, 불확실성 표(Table 6 · 7)</td><td><span class="tag ok">완료</span></td></tr>
+      <tr><td>환경 통일</td><td>transformers 4.44.2로 고정, Phi-3.5V 전 문항 점검(VQA-RAD 451, SLAKE 1061)</td><td><span class="tag ok">완료</span></td></tr>
+      <tr><td>공용 레포 · 공유 폴더</td><td>AIMS_basement, AIMS_shared, 체크포인트 매니페스트(sha256), 불확실성 계산 명세, handoff 브랜치 갱신</td><td><span class="tag ok">완료</span> <span class="note">(일부 브랜치 푸시 전)</span></td></tr>
+      <tr><td>Phi-3 (팀원 코드)</td><td>RAG · CFG 실행은 팀원 담당. 팀원 코드를 점검하는 노트북만 준비</td><td><span class="tag warn">우리 쪽 결과 없음</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="s-setup">
+  <h2>실험 설정</h2>
+  <div class="scroll"><table>
+    <tbody>
+      <tr><th>모델</th><td>Phi-3.5V-Med LoRA를 train으로 이어서 학습한 어댑터 (VQA-RAD ckpt-257, SLAKE ckpt-380). train으로만 학습, val로 체크포인트 선택, test는 한 번</td></tr>
+      <tr><th>평가 대상</th><td>VQA-RAD test 451문항, SLAKE 영어 test 1,061문항</td></tr>
+      <tr><th>5% 게이팅</th><td>베이스라인 예측의 엔트로피 상위 5% 문항에만 RAG · Expert 처리 (VQA-RAD 23문항, SLAKE 53문항). 나머지는 베이스라인 예측 유지</td></tr>
+      <tr><th>검색 KB</th><td>PEIR 33,572 + ROCO 65,422 + train QA 723항목 = 99,717 (논문: ROCO 70,306 · PEIR 33,572 · 세 데이터셋 train QA, PathVQA는 우리에게 없음). BioMedCLIP, union 검색 (이미지 유사도와 질문 텍스트 유사도 중 큰 값), top-1 캡션 사용</td></tr>
+      <tr><th>CFG</th><td>α = 0.01, β = 3, δ = log β + 2, γ = 1.3과 1.5 (논문 본문 1.5, 부록 Table 7 최고 1.3)</td></tr>
+      <tr><th>채점</th><td><strong>공식은 원본(Phi 방식)</strong>: closed는 정답 단어가 예측에 있으면 정답, open은 단어 recall. S1+S2는 Phi의 VQA-RAD test 오답에서 만든 규칙이라 참고용</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>행의 구분: 정답 사용 여부</h3>
+  <p><span class="tag ok">규칙 준수</span> 정답을 입력에 쓰지 않는 행. 하이라이트는 open은 검색 파일의 규칙, closed는 질문과 가장 많이 겹치는 캡션 문장입니다.</p>
+  <p><span class="tag warn">규칙 완화</span> <strong>논문 방식(전문가 주석 = 정답)</strong> 행. 5%로 선택된 문항 중 open은 캡션에 정답이 없으면 뒤에 <code>정답.</code>을 덧붙이고 정답 문자열을 하이라이트합니다(closed는 정답을 넣지 않음). 논문 5.2절이 open에 정답을 전문가 어노테이션으로 쓴다고 설명하는 것을 따랐고, <strong>test 정답이 입력에 들어가므로 규칙 준수 결과로 보고하지 않고 "전문가 주석이 있을 때의 상한선"으로 읽습니다.</strong></p>
+</section>
+
+<section id="s-results">
+  <h2>결과 (공식 채점, overall)</h2>
+  <h3>베이스라인</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>데이터셋</th><th class="n">open</th><th class="n">closed</th><th class="n">overall</th><th class="n">논문</th><th class="n">차이</th></tr></thead>
+    <tbody>
+      <tr><td>VQA-RAD</td><td class="n">65.33</td><td class="n">88.97</td><td class="n"><strong>79.59</strong></td><td class="n">82.04</td><td class="n">−2.45</td></tr>
+      <tr><td>SLAKE</td><td class="n">85.04</td><td class="n">86.54</td><td class="n"><strong>85.63</strong></td><td class="n">85.20</td><td class="n">+0.43</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">VQA-RAD는 S1+S2(참고)로 80.64(−1.40). 1회 실행이며 시드 간 변동은 측정하지 않았습니다.</p>
+
+  <h3>RAG · Expert-CFG: 베이스라인 대비 변화(Δ)</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>행</th><th>구분</th><th class="n">VQA-RAD 우리</th><th class="n">논문 Δ</th><th class="n">SLAKE 우리 [95% 구간]</th><th class="n">논문 Δ</th></tr></thead>
+    <tbody>
+      <tr class="group"><td colspan="6">논문 방식: 전문가 주석 = 정답 (기본 비교 행)</td></tr>
+      <tr><td>5% Expert-RAG</td><td><span class="tag warn">완화</span></td><td class="n">80.97 (+1.39)</td><td class="n">+1.33</td><td class="n">86.63 (+1.01 [−0.03, +2.07])</td><td class="n">+0.85</td></tr>
+      <tr><td>5% Expert-CFG, γ=1.3</td><td><span class="tag warn">완화</span></td><td class="n">81.44 (+1.85)</td><td class="n">+2.66</td><td class="n">86.95 (+1.32 [+0.35, +2.32])</td><td class="n">+2.55</td></tr>
+      <tr><td>5% Expert-CFG, γ=1.5</td><td><span class="tag warn">완화</span></td><td class="n">81.44 (+1.85)</td><td class="n">+2.66</td><td class="n">86.99 (+1.37 [+0.36, +2.42])</td><td class="n">+2.55</td></tr>
+      <tr class="group"><td colspan="6">정답 미사용</td></tr>
+      <tr><td>w/ RAG (top-1, 전 문항)</td><td><span class="tag ok">준수</span></td><td class="n">82.03 (+2.44)</td><td class="n">−0.89</td><td class="n">85.59 (−0.04 [−1.92, +1.84])</td><td class="n">+0.38</td></tr>
+      <tr><td>5% RAG</td><td><span class="tag ok">준수</span></td><td class="n">80.11 (+0.52)</td><td class="n">0.00</td><td class="n">86.22 (+0.60 [−0.42, +1.62])</td><td class="n">+0.10</td></tr>
+      <tr><td>5% Expert-CFG (γ=1.3과 1.5가 같음)</td><td><span class="tag ok">준수</span></td><td class="n">80.03 (+0.44)</td><td class="n">+2.66</td><td class="n">86.40 (+0.77 [−0.20, +1.74])</td><td class="n">+2.55</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">VQA-RAD의 구간은 출력을 받지 못해 적지 않았습니다. 논문 수치는 arXiv HTML에서 추출한 값입니다(원문 대조 필요). 정답 주입 행은 규칙 준수 결과가 아닙니다.</p>
+
+  <div class="callout warn">
+    <strong class="t">읽을 때 주의할 두 가지</strong>
+    <ul class="tight">
+      <li><strong>VQA-RAD의 w/ RAG +2.44는 논문(−0.89)과 직접 비교하지 않습니다.</strong> 옛 KB에서는 −4.4~−4.8이었다가 v2에서 부호가 바뀌었습니다. v2의 VQA-RAD는 top-1의 약 90%가 같은 이미지의 train QA라서, 이득이 의료 지식이 아니라 같은 이미지의 다른 질문 정보일 가능성이 있습니다(진단 출력 미확인).</li>
+      <li><strong>SLAKE 결과는 게이팅 정의(식 4 / 저장된 엔트로피)가 결과 파일에 기록되어 있지 않습니다.</strong> 이후 실행부터 기록되도록 고쳤고, 현재 값이 어느 쪽이었는지는 Drive의 엔트로피 캐시로 확인해야 합니다.</li>
+    </ul>
+  </div>
+
+  <h3>논문과 우리의 증분 비교</h3>
+  <div class="cols">
+    <div class="chart">
+      <h3>VQA-RAD</h3>
+      <p class="sub">베이스라인 대비 Δ, %p</p>
+      <div class="row"><div class="lab">5% RAG</div><div class="bars">
+        <div class="bar"><span class="track"><span class="fill paper" style="width:0%"></span></span><span class="val">0.00</span></div>
+        <div class="bar"><span class="track"><span class="fill ours" style="width:17.3%"></span></span><span class="val">+0.52</span></div></div></div>
+      <div class="row"><div class="lab">Expert-RAG <span class="tag warn">완화</span></div><div class="bars">
+        <div class="bar"><span class="track"><span class="fill paper" style="width:44.3%"></span></span><span class="val">+1.33</span></div>
+        <div class="bar"><span class="track"><span class="fill relaxed" style="width:46.3%"></span></span><span class="val">+1.39</span></div></div></div>
+      <div class="row"><div class="lab">Expert-CFG <span class="tag warn">완화</span></div><div class="bars">
+        <div class="bar"><span class="track"><span class="fill paper" style="width:88.7%"></span></span><span class="val">+2.66</span></div>
+        <div class="bar"><span class="track"><span class="fill relaxed" style="width:61.7%"></span></span><span class="val">+1.85</span></div></div></div>
+      <div class="row"><div class="lab">Expert-CFG <span class="tag ok">준수</span></div><div class="bars">
+        <div class="bar"><span class="track"><span class="fill paper" style="width:88.7%"></span></span><span class="val">+2.66</span></div>
+        <div class="bar"><span class="track"><span class="fill ours" style="width:14.7%"></span></span><span class="val">+0.44</span></div></div></div>
+    </div>
+    <div class="chart">
+      <h3>SLAKE</h3>
+      <p class="sub">베이스라인 대비 Δ, %p</p>
+      <div class="row"><div class="lab">5% RAG</div><div class="bars">
+        <div class="bar"><span class="track"><span class="fill paper" style="width:3.3%"></span></span><span class="val">+0.10</span></div>
+        <div class="bar"><span class="track"><span class="fill ours" style="width:20%"></span></span><span class="val">+0.60</span></div></div></div>
+      <div class="row"><div class="lab">Expert-RAG <span class="tag warn">완화</span></div><div class="bars">
+        <div class="bar"><span class="track"><span class="fill paper" style="width:28.3%"></span></span><span class="val">+0.85</span></div>
+        <div class="bar"><span class="track"><span class="fill relaxed" style="width:33.7%"></span></span><span class="val">+1.01</span></div></div></div>
+      <div class="row"><div class="lab">Expert-CFG <span class="tag warn">완화</span></div><div class="bars">
+        <div class="bar"><span class="track"><span class="fill paper" style="width:85%"></span></span><span class="val">+2.55</span></div>
+        <div class="bar"><span class="track"><span class="fill relaxed" style="width:44%"></span></span><span class="val">+1.32</span></div></div></div>
+      <div class="row"><div class="lab">Expert-CFG <span class="tag ok">준수</span></div><div class="bars">
+        <div class="bar"><span class="track"><span class="fill paper" style="width:85%"></span></span><span class="val">+2.55</span></div>
+        <div class="bar"><span class="track"><span class="fill ours" style="width:25.7%"></span></span><span class="val">+0.77</span></div></div></div>
+    </div>
+  </div>
+  <div class="legend"><span><i style="background:var(--bar-paper)"></i>논문</span><span><i style="background:var(--bar-relaxed)"></i>우리, 정답 주입(규칙 완화)</span><span><i style="background:var(--bar-ours)"></i>우리, 정답 미사용</span><span>막대 길이는 두 그래프 모두 3.0%p를 100%로 한 같은 눈금</span></div>
+
+  <h3>단계별 증분</h3>
+  <div class="scroll"><table>
+    <thead><tr><th></th><th class="n">5% RAG → Expert-RAG(주입)</th><th class="n">Expert-RAG(주입) → Expert-CFG(주입)</th></tr></thead>
+    <tbody>
+      <tr><td>논문 VQA-RAD</td><td class="n">+1.33</td><td class="n">+1.33</td></tr>
+      <tr><td>우리 VQA-RAD</td><td class="n">+0.87</td><td class="n"><strong>+0.46</strong></td></tr>
+      <tr><td>논문 SLAKE</td><td class="n">+0.75</td><td class="n">+1.70</td></tr>
+      <tr><td>우리 SLAKE</td><td class="n">+0.41</td><td class="n"><strong>+0.31</strong></td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">정답 주입 Expert-CFG의 SLAKE 95% 구간 [+0.35, +2.32]는 논문 값 +2.55를 포함하지 않습니다. 5% 게이팅이 얻을 수 있는 최댓값은 SLAKE 기준 약 +3.4%p(선택 53문항의 오답률 0.679, 오답 약 36개)로 추정되며, 논문의 +2.55는 그중 약 3/4를 고쳐야 나오는 값입니다.</p>
+</section>
+
+<section id="s-analysis">
+  <h2>분석: 확정된 것과 가설</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>내용</th><th>근거</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr><td>정답 주입 Expert-RAG는 논문 수준이다</td><td>VQA-RAD +1.39 대 +1.33, SLAKE +1.01 대 +0.85</td><td><span class="tag ok">확정</span></td></tr>
+      <tr><td>CFG 단계의 증분이 논문보다 작다</td><td>위 단계별 증분 표, SLAKE 구간이 논문 값을 포함하지 않음</td><td><span class="tag ok">확정</span></td></tr>
+      <tr><td>CFG가 작은 이유</td><td>규칙 준수 행에서 γ=1.3과 1.5의 결과가 소수점 둘째 자리까지 같음. CFG가 바꾸는 문항 수를 세어 보지 않았음</td><td><span class="tag warn">원인 미확인</span></td></tr>
+      <tr><td>SLAKE에서 캡션은 "정답 복사 힌트"로 작동한다</td><td>open에서 정답이 top-1 캡션에 있는 391문항은 92.8 → 97.2(+4.4), 없는 254문항은 73.1 → 61.8(−11.3). 전체 변화 −0.04는 두 효과가 상쇄된 값. closed는 +2.64</td><td><span class="tag ok">확정</span></td></tr>
+      <tr><td>검색이 의료 근거가 아니라 QA 텍스트를 가져온다</td><td>top-1이 train QA로 쏠림(VQA-RAD 100%, SLAKE 99.9%), PEIR는 0%, SLAKE open 정답이 캡션에 있는 비율 60.6%</td><td><span class="tag ok">확정</span></td></tr>
+      <tr><td>5% 게이팅의 선택 품질은 좋다</td><td>SLAKE 선택 53문항의 오답률 0.679 대 전체 0.163(약 4배). AUC 전체 0.873 / closed 0.805 / open 0.904</td><td><span class="tag ok">확정</span></td></tr>
+      <tr><td>규칙 준수 Expert 효과가 약한 이유는 전문가 주석(정답) 부재다</td><td>정답 주입 행에서 Expert-RAG가 논문 수준으로 나옴. 논문 5.2절은 open에 정답을 사용</td><td><span class="tag warn">가설</span></td></tr>
+      <tr><td>VQA-RAD w/ RAG의 부호 반전은 같은 이미지 train QA 때문이다</td><td>v2 top-1의 약 90%가 같은 이미지. VQA-RAD 진단 출력을 받지 못함</td><td><span class="tag warn">가설</span></td></tr>
+      <tr><td>closed AUC가 논문 Table 6보다 낮다 (약 0.80 대 0.95)</td><td>집계 정의를 바꿔도 같음. 두 데이터셋이 같은 격차. SLAKE closed에는 yes/no가 아닌 답 61문항이 섞여 있어 Table 6의 yes/no 집합과 다름</td><td><span class="tag bad">미해결</span> <span class="note">팀원 담당</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="s-paper">
+  <h2>논문 원문 대조</h2>
+  <p>요약본이 아니라 원문(arXiv:2507.09209)을 직접 대조했습니다.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>항목</th><th>원문</th><th>우리 처리</th></tr></thead>
+    <tbody>
+      <tr><td>γ</td><td>본문은 1.5. 부록 Table 7의 스윕에서 γ=1.3이 세 데이터셋 모두 최고</td><td>1.3과 1.5를 모두 실행</td></tr>
+      <tr><td>α, β, δ</td><td>α = 0.01, β = 3, δ = log β + 2</td><td>그대로 적용</td></tr>
+      <tr><td>하이라이트</td><td>5.2절: open은 정답, closed는 GPT-4 엔티티와 질문 키워드 매칭. 부록 C: GPT-4 키워드 추출 + 전문가 검토. <strong>메인 Table 1이 어느 쪽인지는 명시 없음</strong></td><td>정답 주입(논문 방식)을 기본 비교 행으로 두되 규칙 완화로 표기</td></tr>
+      <tr><td>KB</td><td>ROCO 70,306, PEIR 33,572, 세 데이터셋 train QA(<code>no</code> 답 제외), 합쳐서 10만 건 이상</td><td>99,717 (ROCO 공개본, PathVQA 없음, GPT-4 문장화 대신 템플릿)</td></tr>
+      <tr><td>쿼리 종류</td><td>Image / Text / Sum / Union 비교는 있으나 <strong>메인에 쓴 것은 명시 없음</strong></td><td>union으로 정함(우리 선택)</td></tr>
+      <tr><td>불확실성</td><td>Table 6: yes/no QA, fine-tuned AUC 0.958 (VQA-RAD) / 0.949 (SLAKE). 본문 Fig. 3은 "세 데이터셋 모두 0.8 초과"만 텍스트로 명시</td><td>우리 전체 AUC 0.82~0.87은 모순 없음. closed 격차는 미해결</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="s-env">
+  <h2>환경 점검: transformers 4.44.2에서 Phi-3.5V</h2>
+  <p>팀 공용 환경을 transformers 4.44.2로 고정하고(Colab Python 3.12, torch 2.11, eager attention, bf16, L4), Phi-3.5V가 그 환경에서 정상 동작하는지 두 데이터셋 전 문항으로 점검했습니다. bitsandbytes는 이 환경의 triton과 맞지 않고 양자화를 쓰지 않아 제외했습니다.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>점검</th><th class="n">VQA-RAD (451)</th><th class="n">SLAKE (1061)</th></tr></thead>
+    <tbody>
+      <tr><td>어댑터 로드 (peft 0.12.0)</td><td class="n">설정 수정 없이 로드</td><td class="n">설정 수정 없이 로드</td></tr>
+      <tr><td>KV 캐시 유무 디코딩 일치 (20문항)</td><td class="n">20/20</td><td class="n">20/20</td></tr>
+      <tr><td>중립 CFG = 일반 생성</td><td class="n">5/5 (차이 0.0000)</td><td class="n">5/5 (차이 0.0000)</td></tr>
+      <tr><td>논문 설정 CFG의 logits 변화</td><td class="n">6.8 ~ 12.2</td><td class="n">8.4 ~ 13.4</td></tr>
+      <tr><td>저장된 베이스라인 예측 재현</td><td class="n">444/451 (98.4%)</td><td class="n">1054/1061 (99.3%)</td></tr>
+      <tr><td>불일치 7문항의 점수 영향</td><td class="n">−0.52%p</td><td class="n">+0.22%p</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">불일치는 bf16 수치 차이로 보이며 방향이 일정하지 않습니다(저장된 예측은 sdpa와 torch 2.3 계열, 점검은 eager와 torch 2.11이라는 것은 가설이고 확인하지 않았습니다). 이 점검이 확인한 것은 모델 · 훅 · 캐시의 정상 동작이고, <strong>RAG · CFG 점수를 4.44.2에서 재현한 것은 아닙니다.</strong> 위 결과표의 점수는 transformers 5.x 호환 패치 환경에서 나왔습니다.</p>
+</section>
+
+<section id="s-shared">
+  <h2>공용 레포와 폴더 정리</h2>
+  <p>팀이 같은 코드, 같은 체크포인트, 같은 입력으로 실험하도록 코드와 파일을 둘로 나눴습니다. <strong>코드와 작은 파일은 레포(AIMS_basement, 비공개), 체크포인트와 큰 파일은 공유 Drive(AIMS_shared)</strong>에 두고, 레포는 파일의 위치와 sha256만 기록합니다.</p>
+
+  <h3>레포 구조 (AIMS_basement)</h3>
+  <pre class="tree">common/        모델과 무관한 코드: 채점(vqa_scoring.py), 검색 파일 생성, 게이팅(gating.py), 하이라이트 규칙(highlights.py)
+phi3/          Phi-3 전용 (환경, 팀원 코드 점검 노트북)
+phi35/         Phi-3.5V 전용 (환경, transformers 4.44.2 점검 노트북)
+data_common/   팀 공통 VQA-RAD 분할 (train 2,749 / val 315 / test 451, 이미지 단위)
+manifests/     체크포인트와 큰 파일의 위치와 sha256
+docs/          규칙(RULES.md), 불확실성 계산 명세(UNCERTAINTY_SPEC.md)
+tests/         CPU 테스트 7개 (엔트로피 집계, 상위 5% 선택, AUC, 하이라이트, train QA 합치기, 검색 방식)
+tools/         저자 파일 받기, 릴리스 해시 기록과 검증</pre>
+  <p class="note">Phi-3와 Phi-3.5V는 CFG 훅이 모델 내부 구조에 의존해서 폴더를 나눴고, 모델과 무관한 로직만 <code>common/</code>에 둡니다. 레포 규칙: 결과마다 규칙 구분과 채점 방식 표기, 비밀값 · 개인 정보 · 체크포인트 · 이미지 커밋 금지.</p>
+
+  <h3>공유 폴더 구조 (AIMS_shared)</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>폴더</th><th>들어 있는 것</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr><td><code>checkpoints/phi35/</code></td><td>어댑터 2개: <code>phi35-vqarad-e10-s42-v1</code>, <code>phi35-slake-e5-s42-v1</code> (어댑터 파일만, 학습 상태 제외)</td><td><span class="tag ok">업로드, 해시 기록</span></td></tr>
+      <tr><td><code>baselines/</code></td><td>베이스라인 test 예측 2개 (VQA-RAD 451, SLAKE 1061). 옛 저장 엔트로피는 정의가 달라 제거</td><td><span class="tag ok">업로드, 해시 기록</span></td></tr>
+      <tr><td><code>rag_assets/</code></td><td>검색 파일 <code>rag_{vqarad,slake}_peir_roco_trainqa_v2.json</code></td><td><span class="tag warn">업로드 셀 준비, 실행 전</span></td></tr>
+      <tr><td><code>uncertainty/</code></td><td>팀원이 계산해 올릴 엔트로피 파일 (명세 작성 완료)</td><td><span class="tag warn">팀원 대기</span></td></tr>
+      <tr><td><code>results/</code></td><td>실행 결과</td><td><span class="tag warn">SLAKE 게이팅 정의 확정 후</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">규칙: 릴리스 폴더(<code>-v1</code>)는 한 번 올리면 덮어쓰지 않고, 바뀌면 <code>-v2</code>로 새로 올립니다. 올린 직후 sha256을 매니페스트에 기록하고, 받는 쪽은 복사한 뒤 해시를 검증합니다. 기반 모델, 공개 데이터셋 이미지, 저자 배포 파일은 올리지 않고 받는 방법만 적었습니다.</p>
+
+  <h3>역할 분담과 인수인계</h3>
+  <ul class="tight">
+    <li><strong>팀원:</strong> Phi-3 쪽 RAG · CFG 실행과 불확실성(엔트로피, 식 4) 계산. Phi-3.5V를 먼저 하기로 했고, 같은 결과가 나오도록 모델 설정 · 문항 짝짓기 · 계산 · 출력 형식 · 점검 목록을 <code>docs/UNCERTAINTY_SPEC.md</code>에 적었습니다. <code>num_crops=16</code>이 빠지면 같은 답에 다른 이미지 토큰으로 엔트로피를 계산하게 되므로 명세에 명시했습니다.</li>
+    <li><strong>본인:</strong> Phi-3.5V의 RAG 세팅과 CFG 검증.</li>
+    <li><strong>handoff 브랜치:</strong> 팀원이 쓰는 Expert-CFG 레포의 브랜치를 통일 정의와 공식 채점 표기로 갱신(원본 JSON 불필요, 실행 순서, 정답 주입 형식 포함).</li>
+  </ul>
+</section>
+
+<section id="s-limits">
+  <h2>한계와 미확인</h2>
+  <ul class="tight">
+    <li>모든 결과가 1회 실행입니다. 시드 간 변동은 측정하지 않았습니다.</li>
+    <li>5% 게이팅은 VQA-RAD 23문항, SLAKE 53문항만 바꿔서 구간이 넓고, 규칙 준수 Expert 행은 구간이 0을 포함합니다.</li>
+    <li>SLAKE 실행의 게이팅 정의가 기록되어 있지 않고, VQA-RAD의 신뢰구간과 w/ RAG 진단 출력은 받지 못했습니다.</li>
+    <li>정답 주입 행에서 closed의 하이라이트 규칙이 규칙 준수 행과 다릅니다(검색 파일의 n-gram 대 겹치는 문장). 공용 모듈은 문장 규칙이라 구현이 어긋나 있고, 점수에 미친 영향은 확인하지 않았습니다.</li>
+    <li>정답을 덧붙이는 형식이 논문의 "전문가가 참조를 수정한다"와 같은지는 확인하지 못했습니다. 정답이 이미 캡션에 있으면 하이라이트가 캡션 속 다른 문장의 같은 단어에 걸릴 수 있습니다(미검증).</li>
+    <li>KB가 논문과 다릅니다(ROCO 4,884건 부족, PathVQA 없음, GPT-4 문장화 없음). 캡션 없이 학습한 어댑터에 캡션을 붙이는 형식 불일치의 영향도 통제 실험을 하지 않았습니다.</li>
+    <li>논문 Table 1의 수치는 HTML 추출값이라 원문과 한 번 더 대조해야 합니다.</li>
+  </ul>
+</section>
+
+<section id="s-next">
+  <h2>다음 주 계획과 논의할 점</h2>
+  <h3>계획</h3>
+  <ol class="tight">
+    <li>CFG가 정답 주입 Expert-RAG 대비 답을 바꾼 문항 수, 맞게 · 틀리게 바뀐 수, 하이라이트 토큰 분포 확인 (CFG 단계가 약한 이유를 직접 가르는 실험).</li>
+    <li>VQA-RAD w/ RAG 진단, SLAKE 게이팅 정의 확인.</li>
+    <li>통제 실험: 섞은 캡션(프롬프트 형식 불일치 대 캡션 내용), 무작위 하이라이트, 검색 변형 비교(이미지→텍스트만 / PEIR+ROCO만).</li>
+    <li>팀원의 Phi-3.5V 엔트로피 파일을 받아 게이팅에 연결하고 우리 값과 대조.</li>
+    <li>RAG · CFG 점수를 4.44.2에서 재현할 수 있도록 02 노트북 이식 검토.</li>
+  </ol>
+  <h3>의견을 구하고 싶은 것</h3>
+  <ul class="tight">
+    <li>논문 방식(전문가 주석 = 정답) 행을 기본 비교 행으로 두고 <span class="tag warn">규칙 완화</span>로 표기하는 방식이 적절한지.</li>
+    <li>규칙 준수 행에서 논문 수준에 가까워지려면 GPT-4 키워드 추출(부록 C) 같은 자동 주석을 도입할지, 현재의 규칙 기반 하이라이트를 유지할지.</li>
+    <li>Phi-3 결과가 나오면 Phi-3.5V와 같은 표(공식 채점, 규칙 구분)에 합치는 방식.</li>
+  </ul>
+</section>
+
+<footer>
+  근거 문서: <code>reports/RAG_CFG_results.md</code> 12절(통일 정의 결과와 알려진 불일치), <code>docs/UNCERTAINTY_SPEC.md</code>(불확실성 계산 명세), <code>manifests/checkpoints.json</code>(공유 폴더 파일의 해시), AIMS_basement README(환경과 결과 현황). 수치는 Colab 실행 출력과 그 출력에서 계산한 값이며, 확인하지 못한 항목은 위에 그렇게 표시했습니다.
+</footer>
+</div>
