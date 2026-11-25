@@ -8,7 +8,7 @@
 ```
 common/            모델과 무관한 코드: 채점(vqa_scoring.py), RAG 검색 파일 생성(build_rag_testjson.py)
 phi3/              Phi-3-vision-128k 전용 코드·설정·requirements (비어 있음: 이식 대기)
-phi35/             Phi-3.5-vision 전용 코드·설정·requirements (비어 있음: 이식 대기)
+phi35/             Phi-3.5-vision: 패키지 phi35cfg/ (학습 · 추론 · 평가 CLI), 실행 노트북, 테스트, 이전 노트북 · 보고서
 data_common/       팀 공통 VQA-RAD 분할 vqarad_img/ (train 2,749 / val 315 / test 451, 이미지 단위 val, 시드 42). 이 JSON과 VQA-RAD 이미지 폴더만 있으면 되고 원본 VQA-RAD JSON은 필요 없다
 manifests/         체크포인트·큰 파일의 위치 라벨과 sha256
 results/           실행 결과 요약 (형식: results/SCHEMA.md)
@@ -44,21 +44,19 @@ python tools/release_manifest.py verify --name <manifests/checkpoints.json 의 �
 
 ## 현재 상태
 
-- 이 레포는 골격이다. Phi-3.5V 쪽 구현은 `Expert-CFG` 레포의 노트북(`Expert_CFG_RAG_comparison.ipynb`)에 있고, Phi-3V 쪽은 팀원 레포(`each-yi/phi3_urp`)에 있다. 두 구현은 논문 식 7~10 정의로 통일했고 아직 한 모듈로 합치지 않았다.
-- 합치기 전에 할 일: (1) Phi-3.5V를 4.44.2에서 스모크 점검, (2) 점검에서 쓰는 중립 설정 테스트(두 가지 logits 동일)와 KV 캐시 유무 디코딩 일치 테스트를 양쪽에 같은 방식으로 추가.
+- Phi-3.5V: `phi35/phi35cfg/` 패키지(4.44.2). CPU 테스트는 `phi35/tests/`. **GPU 점검과 점수 재실행은 아직이다.**
+- Phi-3V: 팀원 코드 복사본 `phi3/phi3cfg/`. 두 패키지는 `common/`만 공유하며 한 모듈로 합치지 않는다.
 
-## 결과 현황 (2026-11-21, Phi-3.5V, 통일 정의 v2, 공식(원본) 채점)
+## 결과 현황 (Phi-3.5V, 원본 채점 = 공식)
 
-기본 비교 행은 논문 방식(정답 주입)이다. 논문 5.2절의 "open은 정답을 전문가 어노테이션으로 쓴다"를 따르지만 메인 Table 1이 이 방식인지는 원문에 명시가 없고, test 정답이 입력에 들어가므로 **규칙 완화(상한선)** 로 표기하며 규칙 준수 결과로 보고하지 않는다.
+**교수님 지침(2026-11-26): 정답 주입 결과를 내지 않는다. S1+S2 채점도 쓰지 않는다.** 아래는 규칙 준수 행이다.
 
 | | VQA-RAD | SLAKE |
 |---|---|---|
 | 베이스라인 | 79.59 (논문 82.04) | 85.63 (논문 85.20) |
-| **5% Expert-RAG (논문 방식, 정답 주입, 규칙 완화)** | +1.39 (논문 +1.33) | +1.01 [−0.03, +2.07] (논문 +0.85) |
-| **5% Expert-CFG (논문 방식, 정답 주입, 규칙 완화)** | +1.85 (논문 +2.66) | +1.32 [+0.35, +2.32] (논문 +2.55) |
-| 5% Expert-CFG (정답 미사용, 규칙 준수) | +0.44 (논문 +2.66) | +0.77 [−0.20, +1.74] (논문 +2.55) |
+| 5% Expert-CFG (정답 미사용) | +0.44 (논문 +2.66) | +0.77 [−0.20, +1.74] (논문 +2.55) |
 
-Expert-RAG(정답 주입)는 논문 수준이고 **CFG 단계의 증분이 논문의 약 1/3~1/5**다(원인 미확인). 상세는 Expert-CFG 레포 작업 브랜치의 `reports/RAG_CFG_results.md` 12절. 이 결과는 transformers 5.x 호환 패치 환경에서 나왔고 4.44.2에서 재현하지 않았다. SLAKE 실행의 게이팅 정의(식 4 / 저장값)는 기록이 없다.
+위 RAG · CFG 수치는 **transformers 5.x 호환 패치 환경에서 낸 이전 기록**이고 4.44.2에서는 아직 내지 않았다(`phi35/phi35cfg`로 다시 낸다). SLAKE 실행의 게이팅 정의(식 4 / 저장값)는 기록이 없다. 과거의 정답 주입 행은 `phi35/reports/RAG_CFG_results.md`에 기록으로만 남긴다. 논문 · 저자 코드와의 대조는 `phi35/reports/RAG_CFG_paper_audit.md`.
 불확실성(엔트로피) 계산은 팀원 담당이며 `docs/UNCERTAINTY_SPEC.md`를 따른다.
 
 ## 아직 정하지 않은 것
@@ -67,5 +65,5 @@ Expert-RAG(정답 주입)는 논문 수준이고 **CFG 단계의 증분이 논�
 |---|---|
 | 공용 저장 위치 | **공유 Drive 폴더 `AIMS_shared`로 정함.** 랩 서버로 옮기게 되면 위치 라벨만 바뀐다 (`manifests/` 규칙은 같다) |
 | 실행 환경 | Colab 또는 랩 GPU 서버 (미정). 서버로 가면 Colab 의존 코드(`/content/...`, `drive.mount`, `!pip`)를 걷어내고 설정 파일로 실행하는 진입점이 필요하다 |
-| 4.44.2에서 Phi-3.5V 동작 | 미검증 (`phi35/README.md`의 점검 목록) |
+| 4.44.2에서 Phi-3.5V 동작 | 이전 스모크 점검은 통과. 새 패키지의 GPU 점검(`phi35/tests/gpu_check.py`)과 RAG · CFG 점수는 미실행 |
 | Hugging Face | 쓰지 않기로 함 (기반 모델과 공개 데이터셋 다운로드에만 사용, 로그인 불필요) |

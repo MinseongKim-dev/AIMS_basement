@@ -10,12 +10,13 @@
 - 규칙 완화 결과는 **항상 별도 행**으로 쓰고 규칙 준수 결과처럼 보고하지 않는다.
 - test로 설정(프롬프트, 규칙, epoch)을 고르는 탐색은 `relaxed`다.
 - test 문항 자체를 학습에 쓰지 않는다.
+- **교수님 지침(2026-11-26): 정답 주입 결과를 내지 않는다. S1+S2도 쓰지 않는다.**
 
 ## 2. 채점
 
 - **공식: 원본(Phi 방식)** — closed는 정답 단어가 예측 토큰에 있으면 정답, open은 정답 토큰 recall. 논문이 recall 기준이라고 밝힌 것과 같은 계열이다.
 - 교수님 지침(통일 평가): closed는 같은 정규화 + accuracy, open은 normalized exact match와 token-level F1. recall은 별도로 적되 accuracy와 직접 비교하지 않는다 → `vqa_scoring.summarize_unified`.
-- `S1+S2`(open의 표기 차이·일반어 생략 허용)는 Phi의 VQA-RAD test 오답에서 도출한 규칙이라 **참고용(`relaxed`)** 이다. 공식 결과로 쓰지 않는다.
+- `S1+S2`(open의 표기 차이·일반어 생략 허용)는 Phi의 VQA-RAD test 오답에서 도출한 `relaxed` 규칙이다. **더 이상 쓰지 않는다**(함수는 과거 결과 확인용으로 남아 있다).
 - 모델별 원래 채점(MUMC 자체 EM, LLaVA-Med 평가 코드)은 **논문 재현 판정용**으로 따로 쓸 수 있다. 이때도 어떤 채점인지 표에 적는다.
 
 ## 3. 결과 기록

@@ -5,37 +5,50 @@
 | 기반 모델 | `microsoft/Phi-3.5-vision-instruct` |
 | Med LoRA | `ecoxial2007/Phi-3.5V-Med` (이어서 학습: r64, lr 1e-4, batch 64, cosine, warmup 0.03) |
 | processor | 저자 `Phi-3.5-vision-instruct/processing_phi3_v_cfg.py`, `processor_config.json` → `python tools/fetch_author_assets.py` (저자 레포에 라이선스가 없어 복사하지 않는다) |
-| 환경 | `transformers==4.44.2`, eager attention. 모델 · 훅 · KV 캐시는 두 데이터셋 전 문항으로 점검 통과 (아래 `smoke_check.ipynb`) |
+| 환경 | `transformers==4.44.2`, 추론은 eager attention, bf16 |
 | 논문 목표 (Table 1, Phi3.5V-Med) | VQA-RAD 82.04 / SLAKE 85.20 (baseline overall) |
 
-## 구성 (Expert-CFG 레포에서 이식, 출처는 `PORTED_FROM.md`)
+## 패키지 `phi35cfg/`
+
+| 모듈 | 하는 일 |
+|---|---|
+| `data.py` | VQA-RAD(`../data_common/vqarad_img/`) · SLAKE 분할, 예측 파일 짝짓기, 이어쓰기 |
+| `model.py` | 기반 모델 + 어댑터 + 저자 processor |
+| `generation.py` | greedy 생성, Expert-CFG(식 7~10), 식 4 엔트로피 |
+| `retrieval.py` | 검색 파일 읽기, 규칙 준수 하이라이트 |
+| `train.py` | downstream 학습 |
+| `infer.py` | `--mode baseline \| rag \| expert_cfg \| entropy` |
+| `evaluate.py` | val 체크포인트 선택(`select`), 결과표(`report`) |
+
+채점 · 게이팅 · 하이라이트 규칙 · 검색 파일 생성은 `../common/`에 있다. 어떤 모드도 정답을 모델 입력에 넣지 않는다.
+
+실험 행: 베이스라인(릴리스된 예측), w/ RAG, w/ 5% RAG, w/ 5% Expert-CFG(γ=1.5, α=0.01, β=3, δ=log β+2). 4.44.2에서 새로 만든 베이스라인은 `baseline-4.44.2-check` 행으로 따로 적는다.
+
+## 실행
+
+Colab: `python tools/pack_phi35_code.py --out <폴더>` → `AIMS_shared/code/`에 올리고 `Phi35V_run.ipynb`를 연다.
+
+GPU 서버(레포가 있는 곳, `phi35/`에서):
+
+```bash
+pip install -r requirements.txt
+python ../tools/fetch_author_assets.py
+python tests/gpu_check.py --dataset vqarad --image-root <이미지> --base-dir <기반 모델> --adapter <어댑터> --retrieval <rag.json> --predictions <test_predictions.json> --out gpu_check.json
+python -m phi35cfg.infer --mode expert_cfg --dataset vqarad --image-root <이미지> --base-dir <기반 모델> --adapter <어댑터>     --retrieval <rag.json> --entropy <entropy.json> --top-percent 5 --output cfg5.jsonl
+python -m phi35cfg.evaluate report --dataset vqarad --baseline <test_predictions.json> --entropy <entropy.json> --cfg5 cfg5.jsonl --out-dir ../results
+```
+
+CPU 테스트(레포 루트): `python phi35/tests/test_data.py` 등 `phi35/tests/test_*.py`.
+
+## 검증 상태
+
+CPU 로직 테스트만 통과했다. **GPU 점검, 4.44.2의 RAG · CFG 점수, 학습 이어하기, 릴리스 베이스라인 재채점(`PHI35_BASELINES` 설정 후 `test_evaluate.py`)은 아직이다.**
+
+## 이전 기록 (실행에 쓰지 않는다)
 
 | 파일 | 내용 |
 |---|---|
-| `01_Phi35V_baseline_VQARAD_SLAKE.ipynb` | 베이스라인 학습 · val 체크포인트 선택 · test 1회 평가 (공통 분할, `DATASET`으로 VQA-RAD / SLAKE) |
-| `02_Expert_CFG_RAG_comparison.ipynb` | RAG · Expert-RAG · Expert-CFG 평가 (논문 식 4 · 7 · 9 · 10, union 검색, 5% 게이팅), 4-2절 진단 · 검색 방식 비교 |
-| `smoke_check.ipynb` | transformers 4.44.2 점검 (어댑터 로드, 베이스라인 재현, 중립 CFG, KV 캐시). `FULL_CHECK`로 전 문항 |
-| `reports/Phi35V_results.md` | 베이스라인 결과와 체크포인트 선택 |
-| `reports/RAG_CFG_results.md` | RAG · CFG 전체 과정과 결과 (12절이 통일 정의 v2 결과) |
-| `reports/weekly_report_2026-11-22.html` | 2026-11-22 주간 보고 (페이지 형식) |
-
-공용 코드는 `../common/`(채점, 검색 파일 생성, 게이팅, 하이라이트), 분할은 `../data_common/vqarad_img/`, 불확실성 계산 명세는 `../docs/UNCERTAINTY_SPEC.md`다.
-
-## 실행 순서 (Colab, GPU)
-
-1. `01`로 어댑터를 학습하거나, 이미 올라간 어댑터를 `AIMS_shared/checkpoints/phi35/`에서 받는다(`../manifests/`로 해시 검증).
-2. 검색 파일은 `../common/build_rag_testjson.py`로 만들거나 `AIMS_shared/rag_assets/`에서 받는다.
-3. `02`를 데이터셋마다 **런타임을 재시작**하고 한 번씩 실행한다.
-4. 환경을 바꿨다면 `smoke_check.ipynb`로 먼저 점검한다.
-
-## 알려진 의존성과 한계 (이식 직후 상태)
-
-- **노트북이 코드를 Expert-CFG 레포에서 clone한다.** `01`과 `02`의 첫 셀이 Expert-CFG의 `handoff/phi35v-vqarad-slake-rag-cfg` 브랜치를 clone해서 `vqa_scoring.py`, 저자 `src/highlighter_modules`, processor, 검색 파일 빌더를 쓴다. 이 레포는 비공개라 Colab에서 바로 clone할 수 없기 때문이다(토큰을 요구하지 않는다). **그 브랜치의 최신 커밋이 원격에 푸시되기 전에는 Colab이 옛 버전을 받는다**(예: 빌더의 `--retrieval` 옵션이 없다). 푸시 전에는 노트북이 Colab에서 정상 동작하지 않을 수 있다.
-- **`02`는 transformers 5.x 호환 패치(12~16번 셀)를 포함한다.** 4.44.2에서 RAG · CFG **점수를 재현한 적은 없다**(스모크는 모델 · 훅 · 캐시 점검일 뿐이다). 4.44.2로 옮기려면 패치를 빼고 다시 실행해야 한다.
-- 결과표의 점수는 5.x 패치 환경에서 나왔다.
-
-## 다음 단계
-
-1. 노트북이 Expert-CFG를 clone하지 않도록 코드를 공유 폴더(`AIMS_shared/code/`, 해시 기록)로 올려 쓰게 한다. 먼저 `common/`의 채점과 빌더, 저자 processor 받기부터.
-2. 02를 4.44.2로 옮기고(5.x 패치 제거) 점수를 다시 낸다.
-3. 02의 생성 · 훅 · 검색 로직을 모듈(`common/retrieval.py`, `records.py`, `phi35/` 모듈)로 나눈다. 이때 정답 주입 행의 closed 하이라이트 규칙을 `common/highlights.py`와 하나로 정한다.
+| `01_Phi35V_baseline_VQARAD_SLAKE.ipynb` | 베이스라인을 만든 노트북 (Expert-CFG 레포에서 이식, `PORTED_FROM.md`) |
+| `02_Expert_CFG_RAG_comparison.ipynb` | 이전 RAG · CFG 평가. transformers 5.x 패치와 정답 주입 행을 포함한다. Expert-CFG 레포를 clone한다 |
+| `smoke_check.ipynb` | 4.44.2 점검 기록. `tests/gpu_check.py`가 대신한다 |
+| `reports/` | 베이스라인 · RAG · CFG 과거 결과, 논문 · 저자 코드 대조(`RAG_CFG_paper_audit.md`) |

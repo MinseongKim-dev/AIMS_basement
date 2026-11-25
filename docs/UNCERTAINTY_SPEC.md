@@ -48,7 +48,7 @@ RAG · Expert-CFG의 5% 게이팅은 베이스라인 예측의 **엔트로피 �
 3. **특수 토큰(`tok.all_special_ids`)인 답 토큰은 평균에서 뺀다.** 답 뒤의 `<|end|>`를 예측하는 위치는 애초에 포함하지 않는다.
 4. 남은 토큰 엔트로피의 평균이 그 문항의 엔트로피. 남은 토큰이 없으면 `null`.
 
-참고용 구현은 이 레포의 02 노트북(Expert-CFG 레포)의 "게이팅 엔트로피" 셀과 팀원 `phi3cfg`의 식 4 구현이며, 두 정의는 같다. 문항당 forward 1번이라 약 2초/문항이다(VQA-RAD 약 15분, SLAKE 약 35분, L4 기준 이전 실행 추정).
+구현은 `phi35/phi35cfg/generation.py`의 `answer_entropy`이고, `python -m phi35cfg.infer --mode entropy`가 5절 형식의 파일을 만든다. 팀원 `phi3cfg`의 식 4 구현과 같은 정의다. 문항당 forward 1번이라 약 2초/문항이다(VQA-RAD 약 15분, SLAKE 약 35분, L4 기준 이전 실행 추정).
 
 ## 5. 출력 형식
 
