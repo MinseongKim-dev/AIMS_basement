@@ -18,7 +18,18 @@ FILES = {
     'phi35/assets': ['Phi-3.5-vision-instruct/processing_phi3_v_cfg.py', 'Phi-3.5-vision-instruct/processor_config.json'],
     'phi3/assets': ['Phi-3-vision-128k-instruct/processing_phi3_v_cfg.py', 'Phi-3-vision-128k-instruct/preprocessor_config.json'],
 }
+# phi35 의 processor 는 `from src.highlighter_modules.utils import txt_highlight_mask` 를 한다 → 같은 커밋에서 받아 경로 구조를 유지한다
+SOURCES = {'phi35/assets/author_src/src/highlighter_modules/utils.py': 'src/highlighter_modules/utils.py'}
+EMPTY = ['phi35/assets/author_src/src/__init__.py']
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def targets():
+    """{저장 경로(레포 기준): 저자 레포 경로 또는 None(빈 파일)}"""
+    out = {f'{dest}/{Path(p).name}': p for dest, paths in FILES.items() for p in paths}
+    out.update(SOURCES)
+    out.update({dest: None for dest in EMPTY})
+    return out
 
 
 def main():
@@ -26,19 +37,18 @@ def main():
     ap.add_argument('--check', action='store_true')
     a = ap.parse_args()
     missing = 0
-    for dest, paths in FILES.items():
-        for p in paths:
-            out = ROOT / dest / Path(p).name
-            if a.check:
-                ok = out.exists()
-                print(('있음 ' if ok else '없음 ') + str(out.relative_to(ROOT)))
-                missing += (not ok)
-                continue
-            out.parent.mkdir(parents=True, exist_ok=True)
-            url = f'https://raw.githubusercontent.com/{REPO}/{REVISION}/{p}'
-            data = urllib.request.urlopen(url, timeout=60).read()
-            out.write_bytes(data)
-            print(f'받음 {out.relative_to(ROOT)}  {len(data)} bytes  sha256={hashlib.sha256(data).hexdigest()[:16]}')
+    for dest, src in targets().items():
+        out = ROOT / dest
+        if a.check:
+            ok = out.exists()
+            print(('있음 ' if ok else '없음 ') + dest)
+            missing += (not ok)
+            continue
+        out.parent.mkdir(parents=True, exist_ok=True)
+        data = b'' if src is None else urllib.request.urlopen(
+            f'https://raw.githubusercontent.com/{REPO}/{REVISION}/{src}', timeout=60).read()
+        out.write_bytes(data)
+        print(f'받음 {dest}  {len(data)} bytes  sha256={hashlib.sha256(data).hexdigest()[:16]}')
     if a.check and missing:
         sys.exit(1)
 
