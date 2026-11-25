@@ -124,9 +124,11 @@ def generate(model, processor, image, question, reference=None, highlights=None,
     tok = processor.tokenizer
     device = model.get_input_embeddings().weight.device
     prompt = build_prompt(tok, question, reference)
-    batch, mask = _inputs(processor, image, prompt, highlights if cfg is not None else None, device)
+    # blank strings are dropped: the authors' processor raises IndexError on them
+    highlights = [h for h in highlights or [] if h and h.strip()] if cfg is not None else []
+    batch, mask = _inputs(processor, image, prompt, highlights, device)
     m = None
-    if cfg is not None and highlights:
+    if highlights:
         if mask is None:
             raise RuntimeError('the processor returned no highlight mask: use the authors\' processor')
         m = (mask[0] == 1).float().to(device)

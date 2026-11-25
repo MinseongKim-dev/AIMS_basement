@@ -52,6 +52,11 @@ def test_notebook_clean():
     assert 'CODE_SHA256' in text and 'release_manifest.py verify' in text
 
 
+def test_notebook_rag_default_is_existing_location():
+    settings = next(''.join(c['source']) for c in _cells() if c['cell_type'] == 'code')
+    assert "/content/drive/MyDrive/ExpertCFG_replication/rag_{DATASET}_peir_roco_trainqa_v2.json" in settings
+
+
 def _commands():
     text = '\n'.join(''.join(c['source']) for c in _cells() if c['cell_type'] == 'code')
     text = re.sub(r'\\\n\s*', ' ', text)

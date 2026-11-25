@@ -116,6 +116,16 @@ def test_no_highlight_is_single_branch():
         assert all(c['B'] == 1 for c in model.calls) and float(model.masks[0].abs().sum()) == 0
 
 
+def test_blank_highlights_never_reach_processor():
+    # the authors' txt_highlight_mask raises IndexError on an empty string
+    proc = F.Processor()
+    r = generate(F.Model(), proc, IMG, 'q', 'ref', ['', '  ', 'finding', None], CFGConfig())
+    assert proc.calls[0][1] == ['finding'] and r['cfg_applied'] is True
+    proc = F.Processor()
+    assert generate(F.Model(), proc, IMG, 'q', 'ref', [''], CFGConfig())['cfg_applied'] is False
+    assert proc.calls[0][1] == []
+
+
 def test_hooks_cleared_on_error():
     model = F.Model(fail=True)
     with raises(RuntimeError, match='forward failed'):
