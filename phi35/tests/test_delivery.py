@@ -48,8 +48,11 @@ def test_notebook_clean():
     cells = _cells()
     assert all(not c.get('outputs') and c.get('execution_count') is None for c in cells if c['cell_type'] == 'code')
     text = ''.join(''.join(c['source']) for c in cells)
-    assert 'Expert-CFG.git' not in text and 'git clone' not in text
-    assert 'CODE_SHA256' in text and 'release_manifest.py verify' in text
+    assert 'Expert-CFG.git' not in text and 'release_manifest.py verify' in text
+    # the repository is public: the notebook clones it (no token, no zip upload) and prints the commit it runs
+    assert 'https://github.com/MinseongKim-dev/AIMS_basement.git' in text and 'git clone' in text
+    assert "REPO_REF = 'phi35cfg-modularization'" in text and 'rev-parse HEAD' in text
+    assert 'CODE_SHA256' not in text and 'ghp_' not in text and 'GITHUB_TOKEN' not in text
 
 
 def test_notebook_rag_default_is_existing_location():

@@ -26,7 +26,7 @@
 
 ## 실행
 
-Colab: `python tools/pack_phi35_code.py --out <폴더>` → `AIMS_shared/code/`에 올리고 `Phi35V_run.ipynb`를 연다.
+Colab: `Phi35V_run.ipynb`를 열고 위에서부터 실행한다. 노트북이 공개 레포의 브랜치(`REPO_REF`)를 clone하고 실행한 커밋을 출력한다. 인터넷에서 clone할 수 없는 곳으로 코드를 옮길 때만 `python tools/pack_phi35_code.py --out <폴더>`를 쓴다.
 
 GPU 서버(레포가 있는 곳, `phi35/`에서):
 

@@ -107,6 +107,8 @@
 - `common/`, `phi35/phi35cfg/`, 필요한 도구와 데이터 분할을 압축해 `AIMS_shared/code/phi35-<버전>/`에 올리고 sha256을 매니페스트에 기록한다. 노트북은 복사 후 검증해서 쓴다.
 - `/content`, `drive.mount` 같은 Colab 경로는 노트북에만 두고 패키지는 인자로 받는다. 랩 서버에서도 CLI가 그대로 돈다.
 
+> 변경 (2026-11-26): 레포가 공개 상태임을 확인해, 실행 노트북은 압축 파일 대신 브랜치를 clone하고 실행한 커밋을 출력한다. 압축 도구는 선택 사항으로 남긴다.
+
 ### 6.8 함께 고칠 것
 - `tools/fetch_author_assets.py`: processor가 import하는 `src/highlighter_modules/utils.py`를 같은 고정 커밋에서 받도록 추가.
 - `docs/RULES.md`: 정답 주입 결과를 내지 않는다는 교수님 지침 추가.
