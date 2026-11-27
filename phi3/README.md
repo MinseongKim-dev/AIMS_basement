@@ -17,7 +17,7 @@ phi3cfg/                    generation.py(논문 식 4 · 7~10) · retrieval.py(
 tests/                      test_logic.py(순수 로직) · cpu_smoke.py(중립 설정, 가이던스 효과, KV 캐시 일치)
 Phi3V_teamproto_colab.ipynb 팀 프로토콜: 학습 · val 선택 · test 베이스라인 (코드를 내장). 결과는 본인 Drive 의 phi3_teamproto 에 저장 (run_teammate_stage 가 읽는다)
 Phi3V_team_A100.ipynb       **우리가 만든 파생본**: 위 A100 노트북의 학습 코드를 쓰되 데이터 · epoch · 선택 규칙을 팀 프로토콜(Phi-3.5V와 같음)로 바꿈. 결과는 phi3_team_a100 (run_teammate_stage 가 읽는다)
-Phi3V_baseline_A100.ipynb   (팀원 원본) 논문 프로토콜 재현: A100(bf16)으로 논문 Table 1 의 Phi3V-Med 베이스라인(VQA-RAD 79.38 / SLAKE 83.98)을 재현. 결과는 phi3_a100
+Phi3V_baseline_A100.ipynb   (팀원 원본을 수정, UPSTREAM.md 이력) A100(bf16)으로 논문 Table 1 의 Phi3V-Med 베이스라인(VQA-RAD 79.38 / SLAKE 83.98) 재현. VQA-RAD는 팀 공통 분할 + val 체크포인트 선택, 기존 어댑터 평가(7-1), 선택적 train+val relaxed 행(7-3). 결과는 phi3_a100
 run_teammate_stage.ipynb    위 결과를 읽어 RAG · Expert-RAG · Expert-CFG 단계를 실행하고 진단
 UPSTREAM.md                 출처 · 수정 규칙 · 수정 이력   (UPSTREAM.sha256 = 원본 해시)
 ```

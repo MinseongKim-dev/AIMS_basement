@@ -47,6 +47,7 @@ def load(adapter=MED_ADAPTER, precision='fp16', crops=16, train=False, revision=
     processor = AutoProcessor.from_pretrained(BASE_MODEL, revision=revision,
                                               trust_remote_code=True, num_crops=crops)
     patch_clip_for_lora(model)
+    attn = getattr(model.config, '_attn_implementation', None)  # recorded in meta (always 'eager' here)
     if train:
         if quant:
             model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
@@ -63,7 +64,7 @@ def load(adapter=MED_ADAPTER, precision='fp16', crops=16, train=False, revision=
     else:
         model.eval()
     meta = {'base_model': BASE_MODEL, 'adapter': adapter, 'precision': precision,
-            'num_crops': crops, 'gpu': torch.cuda.get_device_name(),
+            'num_crops': crops, 'attn': attn, 'gpu': torch.cuda.get_device_name(),
             'versions': {p: importlib.metadata.version(p) for p in
                          ('torch', 'transformers', 'peft', 'accelerate')}}
     return model, processor, meta

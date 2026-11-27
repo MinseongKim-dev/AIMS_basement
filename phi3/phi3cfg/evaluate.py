@@ -76,6 +76,9 @@ def main():
     p.add_argument('--runs', nargs='*', default=[], help='name=path (names: rag, rag5, expert_rag5, expert_cfg5, ...)')
     p.add_argument('--output')
     p.add_argument('--partial', action='store_true', help='score only questions in the baseline file')
+    p.add_argument('--rule', choices=('compliant', 'relaxed'),
+                   help='protocol label stored in the report (team docs/RULES.md); printed with the scores')
+    p.add_argument('--rule-note', default='', help='how the checkpoint was chosen / what was relaxed')
     args = p.parse_args()
     rows = load_data(Path(args.dataset_dir) / f'{args.split}.jsonl', args.split)
     dataset = rows[0]['dataset']
@@ -96,18 +99,32 @@ def main():
         if any('cfg_applied' in r for r in run.values()):
             results[name]['cfg_applied'] = sum(bool(r.get('cfg_applied')) for r in run.values())
     auc = uncertainty_auc(rows, base)
+    meta_path = Path(args.baseline).with_suffix('.meta.json')  # written next to the predictions by phi3cfg.infer
+    runtime = json.loads(meta_path.read_text())['runtime'] if meta_path.exists() else None
 
     paper = PAPER.get(dataset, {}) if args.split == 'test' else {}  # paper numbers are test-set numbers
-    print(f'\n{dataset} ({len(rows)} questions)   uncertainty AUC (baseline entropy) = {auc}')
-    print(f'{"run":<14}{"open":>8}{"closed":>8}{"overall":>9}   | paper open/closed/overall | re-run')
+    print(f'\n{dataset} {args.split} ({len(rows)} questions)   uncertainty AUC (baseline entropy) = {auc}')
+    if args.rule:
+        print(f'rule: {args.rule}' + (f' -- {args.rule_note}' if args.rule_note else ''))
+    if runtime:
+        print('runtime:', {k: runtime.get(k) for k in ('adapter', 'precision', 'num_crops', 'attn', 'gpu')},
+              runtime.get('versions'))
+    print(f'{"run":<14}{"open":>8}{"closed":>8}{"overall":>9}   | paper open/closed/overall '
+          f'| diff (pp) open/closed/overall | re-run')
     for name, m in results.items():
         ref = paper.get(name)
         ref_s = '/'.join(f'{v:.2f}' for v in ref) if ref else '-'
-        print(f'{name:<14}{m["open"]:8.2f}{m["closed"]:8.2f}{m["overall"]:9.2f}   | {ref_s:<25} | {m["replaced"]}')
+        diff_s = '-'
+        if ref:
+            m['paper_diff'] = {k: m[k] - v for k, v in zip(('open', 'closed', 'overall'), ref)}
+            diff_s = '/'.join(f'{v:+.2f}' for v in m['paper_diff'].values())
+        print(f'{name:<14}{m["open"]:8.2f}{m["closed"]:8.2f}{m["overall"]:9.2f}   | {ref_s:<25} '
+              f'| {diff_s:<29} | {m["replaced"]}')
     if args.output:
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.output).write_text(json.dumps({'dataset': dataset, 'uncertainty_auc': auc,
-                                                 'results': results, 'paper': paper}, indent=2))
+        Path(args.output).write_text(json.dumps({'dataset': dataset, 'split': args.split, 'uncertainty_auc': auc,
+                                                 'rule': args.rule, 'rule_note': args.rule_note,
+                                                 'runtime': runtime, 'results': results, 'paper': paper}, indent=2))
 
 
 if __name__ == '__main__':

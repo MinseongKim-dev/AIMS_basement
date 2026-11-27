@@ -18,6 +18,15 @@ from .generation import build_prompt
 from .model import MED_ADAPTER, load, model_dtype
 
 
+def load_train(ds_dir, splits=('train',)):
+    """Rows of the given splits concatenated (e.g. train + validation for the relaxed protocol)."""
+    rows = [r for s in splits for r in load_data(Path(ds_dir) / f'{s}.jsonl', s)]
+    keys = [(r['dataset'], str(r['id'])) for r in rows]
+    if len(set(keys)) != len(keys):
+        raise ValueError('Duplicate question ids across training splits')
+    return rows
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--dataset-dir', required=True)
@@ -29,6 +38,9 @@ def main():
     p.add_argument('--lr', type=float, default=1e-4)
     p.add_argument('--batch', type=int, default=64)
     p.add_argument('--seed', type=int, default=42)
+    p.add_argument('--train-splits', default='train',
+                   help='comma-separated splits to train on, e.g. "train,validation" (relaxed protocol: '
+                        'the validation split is then no longer usable for checkpoint selection)')
     # Not stated in the paper; defaults can be taken from the released adapter's training_args.bin
     p.add_argument('--warmup-ratio', type=float, default=0.03)
     p.add_argument('--weight-decay', type=float, default=0.0)
@@ -45,7 +57,9 @@ def main():
     from transformers import Trainer, TrainerCallback, TrainingArguments, set_seed
     set_seed(args.seed)
     ds_dir = Path(args.dataset_dir)
-    train = load_data(ds_dir / 'train.jsonl', 'train')
+    splits = [s.strip() for s in args.train_splits.split(',') if s.strip()]
+    train = load_train(ds_dir, splits)
+    print(f'Training on {"+".join(splits)}: {len(train)} questions', flush=True)
     model, processor, meta = load(args.adapter, args.precision, args.crops, train=True)
     lora = next(iter(model.peft_config.values()))
     assert lora.r == 64, f'expected LoRA rank 64, got {lora.r}'
