@@ -82,7 +82,8 @@ def test_notebook_commands_parse():
         else:
             seen.append(f'{name}:{getattr(parsed, "command", "")}')
     assert {'gpu_check:', 'train:', 'evaluate:select', 'evaluate:report', 'infer:entropy:all', 'infer:baseline:all',
-            'infer:rag:all', 'infer:rag:gated', 'infer:expert_cfg:gated'} <= set(seen), sorted(set(seen))
+            'infer:rag:all', 'infer:rag:gated', 'infer:expert_cfg:gated',
+            'infer:yesno:all', 'evaluate:yesno'} <= set(seen), sorted(set(seen))
 
 
 def test_gpu_check_verdict():
