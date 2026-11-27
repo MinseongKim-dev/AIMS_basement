@@ -15,6 +15,11 @@ from common.gating import auc_wrong_vs_entropy
 
 LABELS = ('yes', 'no')
 DEFINITIONS = ('D0', 'D1', 'D2')
+DESCRIPTIONS = {   # written into the saved report
+    'D0': 'eq. 4 of the spec (official): answer-token vocabulary entropy, special tokens excluded',
+    'D1': 'check only, not eq. 4: first-token vocabulary entropy with the yes / no variants merged',
+    'D2': 'check only, not eq. 4: first-token binary entropy of P(yes) against P(no)',
+}
 
 
 def label_of(answer):

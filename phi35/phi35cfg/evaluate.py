@@ -195,7 +195,8 @@ def _yesno(a):
             print(line)
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({'split': 'val', 'official': 'D0', 'datasets': datasets}, indent=2), encoding='utf-8')
+    out.write_text(json.dumps({'split': 'val', 'official': 'D0', 'definitions': yesno.DESCRIPTIONS,
+                               'datasets': datasets}, indent=2), encoding='utf-8')
     print('Saved:', out)
 
 

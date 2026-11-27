@@ -211,6 +211,9 @@ def test_yesno_report():
         assert v['datasets']['slake']['n'] == 8 and v['datasets']['vqarad']['adapter_sha256'] == SHA
         assert v['datasets']['vqarad']['auc']['D1'] == 1.0 and v['datasets']['vqarad']['auc']['D0'] < 1.0
         assert 'official: D0' in text and 'vqarad' in text and 'slake' in text
+        defs = v['definitions']                # the saved file says on its own what D1 / D2 are
+        assert set(defs) == {'D0', 'D1', 'D2'} and 'eq. 4' in defs['D0']
+        assert all('not eq. 4' in defs[d] for d in ('D1', 'D2'))
 
 
 def test_yesno_refusals():
