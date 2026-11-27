@@ -3,6 +3,8 @@
   python -m phi35cfg.evaluate select --dataset vqarad --run 129=val129.jsonl 257=val257.jsonl
   python -m phi35cfg.evaluate report --dataset vqarad --baseline test_predictions.json --entropy entropy.json \\
       --rag100 rag.jsonl --rag5 rag5.jsonl --cfg5 cfg5.jsonl --out-dir results
+  python -m phi35cfg.evaluate yesno --vqarad val_pred.jsonl val_probs.jsonl --slake val_pred.jsonl val_probs.jsonl \
+      --out yesno_report.json
 
 Top-x% rows keep the baseline answer for every question that was not selected; a run file must cover
 exactly its target questions.
@@ -16,6 +18,7 @@ import numpy as np
 
 from .data import DATASETS, align, check_records, load_split, read_predictions
 from .infer import load_entropy, select_ids
+from . import yesno
 from common import vqa_scoring as vs
 from common.gating import auc_wrong_vs_entropy
 
@@ -151,6 +154,51 @@ def _print_report(a, rows, base_scores, entropy, results):
             print(f'uncertainty AUC {label:<7} {"-" if auc is None else format(auc, ".3f")}')
 
 
+def _yesno_items(dataset, pred_path, probs_path, data_root):
+    """One item per yes/no val question (wrong answer, D0 / D1 / D2), after checking both run files."""
+    rows, _ = load_split(dataset, 'val', data_root=data_root, check_images=False)
+    names = Path(pred_path).name, Path(probs_path).name
+    preds = align(rows, read_predictions(pred_path).values(), names[0])
+    probs = read_predictions(probs_path)
+    check_records(rows, probs, names[1])
+    metas = [_read_meta(path, required=True) for path in (pred_path, probs_path)]
+    for name, records, mode, meta in zip(names, (preds, probs.values()), ('baseline', 'yesno'), metas):
+        wrong = sorted({str(r.get('mode')) for r in records if r.get('mode') != mode})
+        if wrong:
+            raise ValueError(f'{name}: expected mode {mode!r}, found {wrong}')
+        if meta.get('split') != 'val':
+            raise ValueError(f'{name}: split {meta.get("split")!r}, the comparison runs on val only')
+    sha = [meta.get('adapter_sha256') for meta in metas]
+    if not sha[0] or sha[0] != sha[1]:
+        raise ValueError(f'{names[0]} / {names[1]}: adapter_sha256 is missing or differs')
+    targets = {r['idx'] for r in rows if yesno.label_of(r['answer'])}
+    if set(probs) != targets:
+        raise ValueError(f'{names[1]}: missing {len(targets - set(probs))} yes/no questions, '
+                         f'unexpected {len(set(probs) - targets)}')
+    items = [{'wrong': int(vs.score_phi(preds[i]) < 1.0), 'D0': preds[i]['entropy'],
+              'D1': yesno.merged_entropy(probs[i]['entropy_first'], probs[i]['label_probs']),
+              'D2': yesno.binary_entropy(probs[i]['label_probs'])} for i in sorted(targets)]
+    return items, sha[0]
+
+
+def _yesno(a):
+    inputs = {name: _yesno_items(name, *getattr(a, name), a.data_root) for name in DATASETS}   # check all first
+    datasets = {name: {**yesno.compare(items), 'adapter_sha256': sha} for name, (items, sha) in inputs.items()}
+    print('yes/no questions on val. official: D0 (eq. 4); D1 / D2 are checks, not eq. 4')
+    for name, c in datasets.items():
+        print(f'[{name}] n={c["n"]} wrong={c["n_wrong"]} excluded={c["n_excluded"]}')
+        for d in yesno.DEFINITIONS:
+            auc, diff = c['auc'][d], c['diff'].get(d)
+            line = f'  {d}  AUC {"-" if auc is None else format(auc, ".3f")}'
+            if diff and diff['ci95']:
+                line += f'  vs D0 {diff["value"]:+.3f} [{diff["ci95"][0]:+.3f}, {diff["ci95"][1]:+.3f}]'
+            print(line)
+    out = Path(a.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({'split': 'val', 'official': 'D0', 'datasets': datasets}, indent=2), encoding='utf-8')
+    print('Saved:', out)
+
+
 def build_parser():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest='command', required=True)
@@ -173,6 +221,12 @@ def build_parser():
     r.add_argument('--check-baseline', help='baseline regenerated in this environment')
     r.add_argument('--out-dir', required=True)
     r.add_argument('--checkpoint-name', default='unrecorded', help='name in manifests/checkpoints.json')
+    y = sub.add_parser('yesno', help='compare yes/no entropy definitions on val')
+    for name in DATASETS:
+        y.add_argument(f'--{name}', required=True, nargs=2, metavar=('PREDS', 'PROBS'),
+                       help=f'{name}: val baseline run and val yesno run')
+    y.add_argument('--data-root')
+    y.add_argument('--out', required=True)
     return p
 
 
@@ -195,6 +249,8 @@ def main(argv=None):
                                encoding='utf-8')
         print(f'Selected checkpoint-{step} (written to {a.out})')
         return
+    if a.command == 'yesno':
+        return _yesno(a)
     if (a.rag5 or a.cfg5) and not a.entropy:
         parser.error('--rag5 / --cfg5 need --entropy')
     rows, base_scores, entropy, results = _report(a)       # every input is checked before anything is written

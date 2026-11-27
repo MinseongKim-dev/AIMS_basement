@@ -3,6 +3,7 @@ Set PHI35_BASELINES to the folder holding the two released baseline folders to r
 import contextlib
 import io
 import json
+import math
 import os
 import tempfile
 from pathlib import Path
@@ -157,6 +158,82 @@ def test_report_rejects_partial_or_wrong_runs():
 def test_no_relaxed_rows():
     source = Path(evaluate.__file__).read_text(encoding='utf-8').lower()
     assert 's1s2' not in source and 'inject' not in source
+
+
+SLAKE_VAL = data.to_rows([
+    {'img_id': str(i), 'question': f'S{i}?', 'answer': ('yes', 'No', 'liver')[i % 3], 'answer_type': 'CLOSED'}
+    for i in range(12)])
+SHA = 'a' * 64
+
+
+def _val_rows(dataset):
+    return SLAKE_VAL if dataset == 'slake' else data.load_split('vqarad', 'val', check_images=False)[0]
+
+
+def _yesno_files(d, dataset, **meta_over):
+    """A val baseline run and a yesno run whose merged entropy (D1) is high exactly on the wrong answers."""
+    rows = _val_rows(dataset)
+    preds, probs = [], []
+    for r in rows:
+        wrong = r['idx'] % 4 == 0
+        head = {k: r[k] for k in ('idx', 'question', 'answer', 'answer_type')}
+        preds.append({**head, 'prediction': 'zzz' if wrong else r['answer'], 'mode': 'baseline',
+                      'entropy': (r['idx'] * 7 % 11) / 10})
+        if r['answer'].lower() in ('yes', 'no'):
+            lp = {'yes': {'1': .5}, 'no': {'3': .5}} if wrong else {'yes': {'1': 1.0}, 'no': {'3': 0.0}}
+            probs.append({**head, 'mode': 'yesno', 'entropy_first': math.log(2) if wrong else 0.0,
+                          'label_probs': lp})
+    meta = {'split': 'val', 'adapter_sha256': SHA, **meta_over}
+    return (_write(Path(d) / f'{dataset}_pred.jsonl', preds, meta),
+            _write(Path(d) / f'{dataset}_yn.jsonl', probs, {'split': 'val', 'adapter_sha256': SHA}))
+
+
+def _yesno_main(argv):
+    old = evaluate.load_split
+    evaluate.load_split = lambda dataset, split, **k: (_val_rows(dataset), None)
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out):
+            evaluate.main(argv)
+    finally:
+        evaluate.load_split = old
+    return out.getvalue()
+
+
+def test_yesno_report():
+    with tempfile.TemporaryDirectory() as d:
+        rad, slake = _yesno_files(d, 'vqarad'), _yesno_files(d, 'slake')
+        out = Path(d) / 'sub' / 'report.json'
+        text = _yesno_main(['yesno', '--vqarad', *rad, '--slake', *slake, '--out', str(out)])
+        v = json.loads(out.read_text(encoding='utf-8'))
+        assert v['split'] == 'val' and v['official'] == 'D0' and 'adopted' not in v
+        assert set(v['datasets']) == {'vqarad', 'slake'} and v['datasets']['vqarad']['n'] == 184
+        assert v['datasets']['slake']['n'] == 8 and v['datasets']['vqarad']['adapter_sha256'] == SHA
+        assert v['datasets']['vqarad']['auc']['D1'] == 1.0 and v['datasets']['vqarad']['auc']['D0'] < 1.0
+        assert 'official: D0' in text and 'vqarad' in text and 'slake' in text
+
+
+def test_yesno_refusals():
+    with tempfile.TemporaryDirectory() as d:
+        rad, slake = _yesno_files(d, 'vqarad'), _yesno_files(d, 'slake')
+        out = Path(d) / 'report.json'
+
+        def refuse(vq, message):
+            with raises(ValueError, match=message):
+                _yesno_main(['yesno', '--vqarad', *vq, '--slake', *slake, '--out', str(out)])
+            assert not out.exists()
+
+        lines = Path(rad[1]).read_text(encoding='utf-8').splitlines(True)
+        short = _write(Path(d) / 'short.jsonl', [json.loads(x) for x in lines[:-1]],
+                       {'split': 'val', 'adapter_sha256': SHA})
+        refuse((rad[0], short), 'missing')
+        for over, message in (({'split': 'test'}, 'split'), ({'adapter_sha256': 'b' * 64}, 'adapter'),
+                              ({'adapter_sha256': None}, 'adapter')):
+            (Path(d) / 'x').mkdir(exist_ok=True)
+            bad = _yesno_files(Path(d) / 'x', 'vqarad', **over)
+            refuse((bad[0], rad[1]), message)
+        records = [{**json.loads(x), 'mode': 'rag'} for x in Path(rad[0]).read_text(encoding='utf-8').splitlines()]
+        refuse((_write(Path(d) / 'rag.jsonl', records, {'split': 'val', 'adapter_sha256': SHA}), rad[1]), 'mode')
 
 
 def test_released_baselines():
