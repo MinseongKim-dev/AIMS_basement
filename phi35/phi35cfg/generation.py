@@ -170,6 +170,16 @@ def generate(model, processor, image, question, reference=None, highlights=None,
 
 
 @torch.no_grad()
+def first_token_logp(model, processor, image, question):
+    """Log-probabilities (V,) of the first answer token: the question alone, one forward pass."""
+    device = model.get_input_embeddings().weight.device
+    batch, _ = _inputs(processor, image, build_prompt(processor.tokenizer, question), None, device)
+    logits = model(input_ids=batch['input_ids'], attention_mask=torch.ones_like(batch['input_ids']),
+                   pixel_values=batch['pixel_values'], image_sizes=batch['image_sizes'], use_cache=False).logits
+    return logits[0, -1].float().log_softmax(-1)
+
+
+@torch.no_grad()
 def answer_entropy(model, processor, image, question, prediction):
     """Eq. 4 by teacher forcing `prediction`: mean vocabulary entropy over its non-special tokens
     (docs/UNCERTAINTY_SPEC.md). None when no token remains."""

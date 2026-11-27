@@ -7,9 +7,12 @@ import sys
 import tempfile
 from pathlib import Path
 
+import torch
+
+import _fakes as F
 from _util import REPO, raises, run
 
-from phi35cfg import data, infer, model as model_lib  # noqa: E402
+from phi35cfg import data, infer, model as model_lib, yesno  # noqa: E402
 
 N = 451
 
@@ -163,6 +166,50 @@ def test_entropy_mode():
         assert got['model'] == 'phi35' and got['mode'] == 'teacher_forcing_on_baseline_predictions'
         assert got['n'] == N and got['env']['gpu'] == 'fake' and got['definition'].startswith('eq4')
         assert infer.load_entropy(Path(d) / 'h.json', 'vqarad', N, 'base-v1')[7] == 0.25
+
+
+def test_yesno_mode_runs_only_yes_no_questions_and_resumes():
+    rows, _ = data.load_split('vqarad', 'val', check_images=False)
+    with tempfile.TemporaryDirectory() as d:
+        from PIL import Image
+        images = Path(d) / 'images'
+        images.mkdir()
+        for name in {r['image'] for r in rows}:
+            Image.new('RGB', (2, 2)).save(images / name, format='JPEG')
+        calls = []
+
+        class Proc:
+            tokenizer = 'tokenizer'
+
+        def first_token_logp(model, processor, image, question):
+            calls.append({'question': question})
+            return torch.tensor([.4, .3, .2, .1]).log()
+
+        out = Path(d) / 'yn.jsonl'
+        with patched(model_lib, load=lambda *a, **k: ('model', Proc(), {'gpu': 'fake'})), \
+                patched(infer.generation, first_token_logp=first_token_logp), \
+                patched(infer.yesno, label_token_ids=lambda tok: {'yes': [0, 1], 'no': [2]}):
+            _quiet(_args(d, 'yesno', 'yn.jsonl', '--split', 'val', '--limit', '3'))
+            first = data.read_predictions(out)
+            _quiet(_args(d, 'yesno', 'yn.jsonl', '--split', 'val'))
+            with contextlib.redirect_stderr(io.StringIO()), raises(SystemExit):
+                _quiet(_args(d, 'yesno', 'test.jsonl', '--split', 'test'))
+        lines = [json.loads(line) for line in out.read_text(encoding='utf-8').splitlines()]
+        assert len(first) == 3 and len(lines) == 184 and len({x['idx'] for x in lines}) == 184
+        assert len(calls) == 184 and all(set(c) == {'question'} for c in calls)    # the answer is never passed
+        assert all(yesno.label_of(x['answer']) for x in lines)
+        assert set(lines[0]) == {'idx', 'question', 'answer', 'answer_type', 'mode', 'entropy_first', 'label_probs'}
+        assert lines[0]['mode'] == 'yesno' and abs(lines[0]['label_probs']['yes']['1'] - .3) < 1e-6
+        assert json.loads(Path(str(out) + '.meta.json').read_text(encoding='utf-8'))['split'] == 'val'
+        assert not (Path(d) / 'test.jsonl').exists()
+
+
+def test_first_token_logp():
+    model, processor = F.Model(), F.Processor()
+    logp = infer.generation.first_token_logp(model, processor, 'image', 'finding?')
+    assert logp.shape == (F.V,) and abs(float(logp.exp().sum()) - 1) < 1e-5 and int(logp.argmax()) == 2
+    assert len(model.calls) == 1 and model.calls[0]['n'] == len(F.PROMPT_IDS)
+    assert processor.calls[0][0] == '<user><|image_1|>\nfinding?<end><assistant>'
 
 
 def _assets(d):

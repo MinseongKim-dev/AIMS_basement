@@ -4,6 +4,7 @@
   rag         top-1 retrieved caption in the prompt (all questions, or the top-x% with --top-percent)
   expert_cfg  reference + highlights + classifier-free guidance (eq. 7-10) on the top-x% questions
   entropy     eq. 4 entropy of existing predictions by teacher forcing (docs/UNCERTAINTY_SPEC.md)
+  yesno       val only: first-token "yes" / "no" probabilities of the yes/no questions (a check, not eq. 4)
 
 No mode puts the ground-truth answer into the model input.
 
@@ -18,6 +19,7 @@ from PIL import Image
 
 from . import generation
 from . import model as model_lib
+from . import yesno
 from .data import DATASETS, SPLITS, align, append_record, file_sha256, load_split, open_run, read_predictions
 from .retrieval import compliant_highlights, load_retrieval
 from common.gating import select_top_percent
@@ -47,7 +49,7 @@ def load_entropy(path, dataset, n, predictions=None):
 
 def build_parser():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--mode', required=True, choices=('baseline', 'rag', 'expert_cfg', 'entropy'))
+    p.add_argument('--mode', required=True, choices=('baseline', 'rag', 'expert_cfg', 'entropy', 'yesno'))
     p.add_argument('--dataset', required=True, choices=DATASETS)
     p.add_argument('--split', default='test', choices=SPLITS)
     p.add_argument('--image-root', help='VQA-RAD image folder')
@@ -78,6 +80,8 @@ def _check(parser, a):
         parser.error('--top-percent needs --entropy')
     if a.mode == 'entropy' and not (a.predictions and a.predictions_name and a.adapter_name):
         parser.error('entropy mode needs --predictions, --predictions-name and --adapter-name')
+    if a.mode == 'yesno' and a.split != 'val':
+        parser.error('yesno compares entropy definitions: it runs on --split val only')
 
 
 def _image(images, row):
@@ -123,9 +127,11 @@ def main(argv=None):
     if a.mode == 'entropy':
         return _run_entropy(a, rows, images)
 
-    retrieval = load_retrieval(a.retrieval, rows) if a.mode != 'baseline' and a.retrieval else None
+    retrieval = load_retrieval(a.retrieval, rows) if a.mode in ('rag', 'expert_cfg') else None
     targets = rows
-    if a.mode != 'baseline' and a.top_percent is not None:
+    if a.mode == 'yesno':
+        targets = [r for r in rows if yesno.label_of(r['answer'])]
+    elif a.mode != 'baseline' and a.top_percent is not None:
         entropy = load_entropy(a.entropy, a.dataset, len(rows), a.predictions_name)
         selected = set(select_ids(entropy, len(rows), a.top_percent))
         targets = [r for r in rows if r['idx'] in selected]
@@ -145,9 +151,17 @@ def main(argv=None):
     todo = [r for r in targets if r['idx'] not in done]
     if a.limit is not None:
         todo = [r for r in targets[:a.limit] if r['idx'] not in done]
+    ids = yesno.label_token_ids(processor.tokenizer) if a.mode == 'yesno' else None
 
     for n, r in enumerate(todo, 1):
         image = _image(images, r)
+        if a.mode == 'yesno':
+            logp = generation.first_token_logp(model, processor, image, r['question'])
+            append_record(a.output, {
+                'idx': r['idx'], 'question': r['question'], 'answer': r['answer'], 'answer_type': r['answer_type'],
+                'mode': a.mode, **yesno.probe_record(logp, ids)})
+            print(f'[{n}/{len(todo)}] Q: {r["question"][:60]}', flush=True)
+            continue
         entropy = None
         if a.mode == 'baseline':
             res = generation.generate(model, processor, image, r['question'])
