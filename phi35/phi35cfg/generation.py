@@ -164,9 +164,13 @@ def generate(model, processor, image, question, reference=None, highlights=None,
     finally:
         if guided:
             hooks.clear()
-    text = processor.batch_decode(torch.tensor([new], dtype=torch.long), skip_special_tokens=True,
+    return {'prediction': _text(processor, new), 'cfg_applied': guided, 'highlight_tokens': n_highlight}
+
+
+def _text(processor, ids):
+    text = processor.batch_decode(torch.tensor([ids], dtype=torch.long), skip_special_tokens=True,
                                   clean_up_tokenization_spaces=False)[0]
-    return {'prediction': text.strip().strip('.'), 'cfg_applied': guided, 'highlight_tokens': n_highlight}
+    return text.strip().strip('.')
 
 
 @torch.no_grad()
@@ -177,6 +181,44 @@ def first_token_logp(model, processor, image, question):
     logits = model(input_ids=batch['input_ids'], attention_mask=torch.ones_like(batch['input_ids']),
                    pixel_values=batch['pixel_values'], image_sizes=batch['image_sizes'], use_cache=False).logits
     return logits[0, -1].float().log_softmax(-1)
+
+
+@torch.no_grad()
+def answer_distribution(model, processor, image, question, n_samples, seed, max_new_tokens=64):
+    """The greedy answer (with its token log-probabilities and eq. 4 entropy) and n_samples answers drawn
+    at temperature 1, from the question alone. One forward pass per distinct answer prefix."""
+    tok = processor.tokenizer
+    device = model.get_input_embeddings().weight.device
+    batch, _ = _inputs(processor, image, build_prompt(tok, question), None, device)
+    stops, special = _stop_ids(tok), set(tok.all_special_ids)
+    seen = {}
+
+    def next_logp(prefix):
+        if prefix not in seen:
+            ids = torch.cat([batch['input_ids'], torch.tensor([prefix], dtype=torch.long, device=device)], 1)
+            logits = model(input_ids=ids, attention_mask=torch.ones_like(ids), pixel_values=batch['pixel_values'],
+                           image_sizes=batch['image_sizes'], use_cache=False).logits[0, -1]
+            seen[prefix] = logits.float().log_softmax(-1).cpu()
+        return seen[prefix]
+
+    def decode(choose):
+        answer = ()
+        while len(answer) < max_new_tokens:
+            token = choose(next_logp(answer))
+            if token in stops:
+                break
+            answer += (token,)
+        return answer
+
+    greedy = decode(lambda logp: int(logp.argmax()))
+    steps = [next_logp(greedy[:i]) for i in range(len(greedy))]
+    entropy = aggregate_entropy([float(-torch.where(l.exp() > 0, l.exp() * l, torch.zeros_like(l)).sum())
+                                 for l in steps], list(greedy), special)
+    rng = torch.Generator().manual_seed(seed)
+    samples = [decode(lambda logp: int(torch.multinomial(logp.exp(), 1, generator=rng))) for _ in range(n_samples)]
+    return {'prediction': _text(processor, list(greedy)),
+            'token_logp': [float(l[t]) for l, t in zip(steps, greedy) if t not in special],
+            'entropy': entropy, 'samples': [_text(processor, list(s)) for s in samples]}
 
 
 @torch.no_grad()

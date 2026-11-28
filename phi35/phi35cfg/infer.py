@@ -5,6 +5,7 @@
   expert_cfg  reference + highlights + classifier-free guidance (eq. 7-10) on the top-x% questions
   entropy     eq. 4 entropy of existing predictions by teacher forcing (docs/UNCERTAINTY_SPEC.md)
   yesno       val only: first-token "yes" / "no" probabilities of the yes/no questions (a check, not eq. 4)
+  table6      closed questions: greedy token probabilities, eq. 4 entropy and 10 samples (paper Table 6)
 
 No mode puts the ground-truth answer into the model input.
 
@@ -19,7 +20,7 @@ from PIL import Image
 
 from . import generation
 from . import model as model_lib
-from . import yesno
+from . import table6, yesno
 from .data import DATASETS, SPLITS, align, append_record, file_sha256, load_split, open_run, read_predictions
 from .retrieval import compliant_highlights, load_retrieval
 from common.gating import select_top_percent
@@ -49,7 +50,7 @@ def load_entropy(path, dataset, n, predictions=None):
 
 def build_parser():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--mode', required=True, choices=('baseline', 'rag', 'expert_cfg', 'entropy', 'yesno'))
+    p.add_argument('--mode', required=True, choices=('baseline', 'rag', 'expert_cfg', 'entropy', 'yesno', 'table6'))
     p.add_argument('--dataset', required=True, choices=DATASETS)
     p.add_argument('--split', default='test', choices=SPLITS)
     p.add_argument('--image-root', help='VQA-RAD image folder')
@@ -131,6 +132,8 @@ def main(argv=None):
     targets = rows
     if a.mode == 'yesno':
         targets = [r for r in rows if yesno.label_of(r['answer'])]
+    elif a.mode == 'table6':
+        targets = [r for r in rows if r['answer_type'] == 'CLOSED']
     elif a.mode != 'baseline' and a.top_percent is not None:
         entropy = load_entropy(a.entropy, a.dataset, len(rows), a.predictions_name)
         selected = set(select_ids(entropy, len(rows), a.top_percent))
@@ -161,6 +164,14 @@ def main(argv=None):
                 'idx': r['idx'], 'question': r['question'], 'answer': r['answer'], 'answer_type': r['answer_type'],
                 'mode': a.mode, **yesno.probe_record(logp, ids)})
             print(f'[{n}/{len(todo)}] Q: {r["question"][:60]}', flush=True)
+            continue
+        if a.mode == 'table6':
+            res = generation.answer_distribution(model, processor, image, r['question'], table6.N_SAMPLES,
+                                                 seed=table6.SEED * 100000 + r['idx'])
+            append_record(a.output, {
+                'idx': r['idx'], 'question': r['question'], 'answer': r['answer'], 'answer_type': r['answer_type'],
+                'mode': a.mode, **res})
+            print(f'[{n}/{len(todo)}] Q: {r["question"][:60]} | P: {res["prediction"][:60]}', flush=True)
             continue
         entropy = None
         if a.mode == 'baseline':

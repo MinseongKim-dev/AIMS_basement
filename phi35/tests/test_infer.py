@@ -3,6 +3,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import math
 import sys
 import tempfile
 from pathlib import Path
@@ -210,6 +211,49 @@ def test_first_token_logp():
     assert logp.shape == (F.V,) and abs(float(logp.exp().sum()) - 1) < 1e-5 and int(logp.argmax()) == 2
     assert len(model.calls) == 1 and model.calls[0]['n'] == len(F.PROMPT_IDS)
     assert processor.calls[0][0] == '<user><|image_1|>\nfinding?<end><assistant>'
+
+
+def test_answer_distribution():
+    processor = F.Processor()
+    P = len(F.PROMPT_IDS)
+    first = torch.zeros(F.V)
+    first[2] = first[3] = 20.0                                   # the first token is 'a' or 'b', evenly
+    model = F.Model(script=(2, F.END), table={P - 1: first})
+    got = infer.generation.answer_distribution(model, processor, 'image', 'finding?', n_samples=40, seed=1)
+    assert got['prediction'] == 'a' and len(got['token_logp']) == 1
+    assert abs(got['token_logp'][0] - math.log(.5)) < 1e-3 and abs(got['entropy'] - math.log(2)) < 1e-3
+    assert set(got['samples']) == {'a', 'b'} and len(got['samples']) == 40
+    assert len(model.calls) == 3                                 # one forward per distinct prefix: '', 'a', 'b'
+    assert all(c['pixels'] for c in model.calls)
+    again = infer.generation.answer_distribution(F.Model(script=(2, F.END), table={P - 1: first}), processor,
+                                                 'image', 'finding?', n_samples=40, seed=1)
+    assert again['samples'] == got['samples']
+    empty = infer.generation.answer_distribution(F.Model(script=(F.END,)), processor, 'image', 'finding?',
+                                                 n_samples=2, seed=0)
+    assert empty['prediction'] == '' and empty['token_logp'] == [] and empty['entropy'] is None
+
+
+def test_table6_mode_runs_closed_questions_only():
+    rows, _ = data.load_split('vqarad', 'test', check_images=False)
+    with tempfile.TemporaryDirectory() as d:
+        _fixture(d)
+        calls = []
+
+        def answer_distribution(model, processor, image, question, n_samples, seed, max_new_tokens=64):
+            calls.append((question, n_samples, seed))
+            return {'prediction': 'yes', 'token_logp': [-.1], 'entropy': .2, 'samples': ['yes'] * n_samples}
+
+        with fake_model([]), patched(infer.generation, answer_distribution=answer_distribution):
+            _quiet(_args(d, 'table6', 't.jsonl', '--limit', '3'))
+            _quiet(_args(d, 'table6', 't.jsonl'))
+        got = data.read_predictions(Path(d) / 't.jsonl')
+        closed = [r['idx'] for r in rows if r['answer_type'] == 'CLOSED']
+        assert sorted(got) == closed and len(calls) == 272 and {c[1] for c in calls} == {10}
+        assert len({c[2] for c in calls}) == 272                 # a seed per question, independent of resuming
+        assert set(got[closed[0]]) == {'idx', 'question', 'answer', 'answer_type', 'mode', 'prediction',
+                                       'token_logp', 'entropy', 'samples'}
+        meta = json.loads((Path(d) / 't.jsonl.meta.json').read_text(encoding='utf-8'))
+        assert meta['split'] == 'test' and meta['mode'] == 'table6'
 
 
 def _assets(d):
