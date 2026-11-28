@@ -5,8 +5,9 @@ KB 구성 (--kb, 쉼표 구분, 기본 peir,roco,trainqa):
   roco     ROCO 캡션 (HF eltorio/ROCO-radiology, train; 캡션 열만 읽는다. 공개본 65,423 중 65,422 사용)
   trainqa  VQA-RAD · SLAKE 의 **train** QA. 같은 이미지의 QA 를 한 항목으로 합치고 답이 'no' 인 QA 는 뺀다.
            문장은 "질문? 답." 형식(팀원 phi3_urp 의 qa_sentence 와 같음). val / test 는 쓰지 않는다.
-논문의 KB 는 ROCO 70,306 + PEIR 33,572 + 세 데이터셋 train QA(GPT-4 로 문장화)다. 우리는 PathVQA 가 없고, ROCO 는 공개본이며,
-문장화는 GPT-4 대신 위 템플릿이다. 결과표에는 "자체 검색 + KB 구성"으로 표기한다.
+           --pathvqa 를 주면 PathVQA train QA(HF flaviagiammarino/path-vqa, 고정 커밋)도 같은 규칙으로 넣는다.
+논문의 KB 는 ROCO 70,306 + PEIR 33,572 + 세 데이터셋 train QA(GPT-4 로 문장화)다. 논문 구성은 --pathvqa 를 준 것이고, 그래도
+ROCO 는 공개본이며 문장화는 GPT-4 대신 위 템플릿이다. 결과표에는 "자체 검색 + KB 구성"으로 표기한다.
 
 검색 (--retrieval):
   union  (train QA 가 있으면 기본) max(이미지 유사도, 질문 텍스트 유사도). 이미지 유사도는 trainqa 항목이면 이미지↔이미지, PEIR · ROCO 면 이미지→텍스트.
@@ -17,9 +18,10 @@ KB 구성 (--kb, 쉼표 구분, 기본 peir,roco,trainqa):
 입력: 공통 분할 JSON(레포의 data_common/vqarad_img/{trainset,testset}.json)과 VQA-RAD 이미지 폴더. 원본 VQA-RAD JSON 은 필요 없다.
 실행 (Colab, GPU):
   python -u common/build_rag_testjson.py --peir_dir <PEIR 폴더> --vqarad_common data_common/vqarad_img/testset.json       --vqarad_train data_common/vqarad_img/trainset.json --vqarad_img <VQA-RAD 이미지 폴더> --out_dir <출력 폴더> --out_suffix _v2
-출력: rag_{vqarad,slake}_<kb>[<접미어>].json, rag_meta_<kb>[<접미어>].json, 텍스트 피처 캐시(.npy)
+출력: rag_{vqarad,slake}_<kb>[_pathvqa][<접미어>].json, rag_meta_<kb>[_pathvqa][<접미어>].json, 텍스트 피처 캐시(.npy)
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -29,6 +31,9 @@ import numpy as np
 
 MID = 'hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224'
 TOP_K = 5
+PATHVQA_REPO = 'flaviagiammarino/path-vqa'
+PATHVQA_REVISION = '1685832883334b5bb5beaf4e4b333fdeecaa4ad9'
+PATHVQA_TRAIN_QA = 19654
 
 ORGAN_WORDS = {
     'chest': ['chest', 'lung', 'thorax', 'thoracic', 'heart', 'cardiac', 'cardiovascular', 'pleura', 'rib'],
@@ -165,6 +170,28 @@ def paper_trainqa_groups(items):
     return [(n, p, ' '.join(sents)) for (n, p), sents in groups.items()]
 
 
+def kb_tag(kbs, pathvqa):
+    """출력 파일 이름의 KB 표시. PathVQA 를 넣은 파일은 이름이 달라 기존 파일을 덮지 않는다."""
+    if pathvqa and 'trainqa' not in kbs:
+        raise ValueError('--pathvqa 는 --kb 에 trainqa 가 있어야 합니다')
+    return '_'.join(kbs) + ('_pathvqa' if pathvqa else '')
+
+
+def pathvqa_items(rows, img_dir):
+    """rows: (이미지 바이트, 질문, 답). 반환: (이미지 이름, 경로, 질문, 답).
+    PathVQA 는 행마다 파일 이름이 달라, 같은 사진은 내용의 해시를 이름으로 써서 묶는다."""
+    os.makedirs(img_dir, exist_ok=True)
+    items = []
+    for data, q, a in rows:
+        name = f'pathvqa_{hashlib.sha256(data).hexdigest()[:16]}.jpg'
+        path = os.path.join(img_dir, name)
+        if not os.path.exists(path):
+            with open(path, 'wb') as fh:
+                fh.write(data)
+        items.append((name, path, q, a))
+    return items
+
+
 # ───────────────────────── 인코더 · 데이터 ─────────────────────────
 class Encoder:
     def __init__(self):
@@ -237,6 +264,23 @@ def load_roco_captions(split='train'):
     return caps
 
 
+def load_pathvqa_train():
+    """PathVQA train 의 (이미지 바이트, 질문, 답). row group 단위로 읽는다 (약 480 MB)."""
+    import pyarrow.parquet as pq
+    from huggingface_hub import HfFileSystem
+    fs = HfFileSystem()
+    files = sorted(fs.glob(f'datasets/{PATHVQA_REPO}/data/train-*.parquet', revision=PATHVQA_REVISION))
+    assert files, 'PathVQA train parquet 을 찾지 못했습니다'
+    for f in files:
+        with fs.open(f, 'rb', revision=PATHVQA_REVISION) as fh:
+            table = pq.ParquetFile(fh)
+            for g in range(table.num_row_groups):
+                t = table.read_row_group(g, columns=['image', 'question', 'answer'])
+                for image, q, a in zip(t.column('image').to_pylist(), t.column('question').to_pylist(),
+                                       t.column('answer').to_pylist()):
+                    yield image['bytes'], q, a
+
+
 def cached_text_feats(enc, texts, path, texts_path):
     if os.path.exists(path) and os.path.exists(texts_path):
         saved = json.load(open(texts_path, encoding='utf-8'))
@@ -264,11 +308,13 @@ def main():
                     help='cross: 이미지 쿼리 x 텍스트 / union: max(이미지 유사도, 질문 텍스트 유사도). 기본: trainqa 가 KB 에 있으면 union, 없으면 cross')
     ap.add_argument('--out_suffix', default='', help='출력 파일 이름 접미어 (예: _v2). 기존 결과 파일을 덮어쓰지 않기 위함')
     ap.add_argument('--slake_img', default='/content/slake_data/imgs', help='SLAKE train 이미지 폴더 (trainqa=paper 에서 이미지 피처에 필요)')
+    ap.add_argument('--pathvqa', action='store_true', help='train QA 에 PathVQA train 을 추가한다 (논문 KB 구성)')
+    ap.add_argument('--pathvqa_img', default='/content/pathvqa_train_imgs', help='PathVQA train 이미지를 풀어 둘 폴더')
     a = ap.parse_args()
     kbs = [x.strip() for x in a.kb.split(',') if x.strip()]
     assert kbs and set(kbs) <= {'peir', 'roco', 'trainqa'}, kbs
-    tag = '_'.join(kbs)
-    suffix = ('' if kbs == ['peir'] else f'_{tag}') + a.out_suffix
+    tag = kb_tag(kbs, a.pathvqa)
+    suffix = ('' if tag == 'peir' else f'_{tag}') + a.out_suffix
     if a.retrieval is None:
         a.retrieval = 'union' if 'trainqa' in kbs else 'cross'
     if a.retrieval == 'union':
@@ -297,7 +343,13 @@ def main():
         assert a.vqarad_train, '--vqarad_train 이 필요합니다'
         items = [(r['image_name'], os.path.join(a.vqarad_img, r['image_name']), r['question'], r['answer']) for r in load_vqarad(a.vqarad_train)]
         items += [(r['img_name'], os.path.join(a.slake_img, r['img_name']), r['question'], r['answer']) for r in slake_split('train')]
+        if a.pathvqa:
+            added = pathvqa_items(load_pathvqa_train(), a.pathvqa_img)
+            assert len(added) == PATHVQA_TRAIN_QA, len(added)
+            items += added
         groups = paper_trainqa_groups(items)
+        if a.pathvqa:
+            counts['trainqa_pathvqa'] = sum(n.startswith('pathvqa_') for n, _, _ in groups)
         texts = [t for _, _, t in groups]
         imf = enc.images([pth for _, pth, _ in groups]) if a.retrieval == 'union' else None
         kb.add(texts, 'trainqa', [n for n, _, _ in groups], enc.text(texts), imf); counts['trainqa'] = len(texts)
@@ -311,7 +363,8 @@ def main():
     meta = {'encoder': MID, 'top_k': TOP_K, 'kb': kbs, 'kb_counts': counts,
             'method': '이미지 직접 인코딩 x KB 텍스트 인코딩, 코사인 top-k (자체 검색)' if a.retrieval == 'cross'
                       else 'union = max(이미지 유사도, 질문 텍스트 유사도), 이미지 유사도는 trainqa 항목만 이미지↔이미지 (팀원 phi3_urp 방식 해석)',
-            'trainqa_style': 'paper', 'retrieval': a.retrieval}
+            'trainqa_style': 'paper', 'retrieval': a.retrieval,
+            'pathvqa': {'repo': PATHVQA_REPO, 'revision': PATHVQA_REVISION} if a.pathvqa else None}
     sl_rows, sl_img = slake_test_rows()
     for name, rows, img_root in (('vqarad', vqarad_test_rows(a.vqarad_common), a.vqarad_img), ('slake', sl_rows, sl_img)):
         qtxts = enc.text([str(r['question']) for r in rows]) if a.retrieval == 'union' else None

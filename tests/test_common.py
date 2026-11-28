@@ -53,6 +53,31 @@ def test_trainqa_groups():
     assert g == [('a.jpg', 'pa', 'Is it CT? yes. what organ? lung.'), ('c.jpg', 'pc', 'Which plane? axial.')], g
 
 
+def test_pathvqa_items():
+    import tempfile
+    # PathVQA 는 행마다 파일 이름이 다르므로 같은 사진은 내용(바이트)으로 묶는다
+    rows = [(b'img-one', 'what is shown?', 'liver'), (b'img-two', 'is it red?', 'no'),
+            (b'img-one', 'is it enlarged?', 'yes')]
+    with tempfile.TemporaryDirectory() as d:
+        items = B.pathvqa_items(iter(rows), d)
+        names = [n for n, _, _, _ in items]
+        assert names[0] == names[2] != names[1] and all(n.startswith('pathvqa_') for n in names)
+        assert [(q, a) for _, _, q, a in items] == [(r[1], r[2]) for r in rows]
+        assert [open(path, 'rb').read() for _, path, _, _ in items] == [r[0] for r in rows]
+        g = B.paper_trainqa_groups(items)
+        assert len(g) == 1 and g[0][2] == 'what is shown? liver. is it enlarged? yes.'
+
+
+def test_kb_tag():
+    assert B.kb_tag(['peir', 'roco', 'trainqa'], False) == 'peir_roco_trainqa'
+    assert B.kb_tag(['peir', 'roco', 'trainqa'], True) == 'peir_roco_trainqa_pathvqa'     # 기존 파일을 덮지 않는다
+    try:
+        B.kb_tag(['peir'], True)
+        raise AssertionError('pathvqa without trainqa accepted')
+    except ValueError:
+        pass
+
+
 def test_retrieval_modes():
     import numpy as np
     kb = B.KB()
