@@ -239,6 +239,46 @@ def test_yesno_refusals():
         refuse((_write(Path(d) / 'rag.jsonl', records, {'split': 'val', 'adapter_sha256': SHA}), rad[1]), 'mode')
 
 
+def test_table6_report():
+    rows = data.load_split('vqarad', 'test', check_images=False)[0]
+    records = []
+    for r in rows:
+        if r['answer_type'] != 'CLOSED':
+            continue
+        wrong = r['idx'] % 8 == 0
+        text = 'zzz' if wrong else r['answer']
+        records.append({**{k: r[k] for k in ('idx', 'question', 'answer', 'answer_type')}, 'mode': 'table6',
+                        'prediction': text, 'token_logp': [math.log(.6 if wrong else .95)],
+                        'entropy': .6 if wrong else .1, 'samples': [text] * (6 if wrong else 10) + ['q'] * (4 if wrong else 0)})
+    with tempfile.TemporaryDirectory() as d:
+        run_ = _write(Path(d) / 't.jsonl', records, {'split': 'test', 'runtime': RUNTIME})
+        out = Path(d) / 'sub' / 't.json'
+        old = evaluate.load_split
+        evaluate.load_split = lambda *a, **k: (rows, None)
+        try:
+            def go(path):
+                text = io.StringIO()
+                with contextlib.redirect_stdout(text):
+                    evaluate.main(['table6', '--dataset', 'vqarad', '--run', path, '--out', str(out)])
+                return text.getvalue()
+
+            short = _write(Path(d) / 's.jsonl', records[:-1], {'split': 'test'})
+            val = _write(Path(d) / 'v.jsonl', records, {'split': 'val'})
+            other = _write(Path(d) / 'o.jsonl', [{**x, 'mode': 'rag'} for x in records], {'split': 'test'})
+            for bad, message in ((short, 'missing'), (val, 'split'), (other, 'mode')):
+                with raises(ValueError, match=message):
+                    go(bad)
+                assert not out.exists()
+            text = go(run_)
+        finally:
+            evaluate.load_split = old
+        got = json.loads(out.read_text(encoding='utf-8'))
+        assert got['dataset'] == 'vqarad' and got['env']['transformers'] == '4.44.2'
+        assert set(got['subsets']) == {'closed', 'yes/no'} and got['subsets']['closed']['rows']['Entropy']['n'] == 272
+        assert got['paper']['Entropy'] == {'ece': .068, 'ece_t': .024, 'bs_t': .066, 'auc': .958}
+        assert 'not ROC' in got['note'] and '0.958' in text and 'Label prob.' in text and 'accuracy' in text
+
+
 def test_released_baselines():
     root = os.environ.get('PHI35_BASELINES')
     if not root:

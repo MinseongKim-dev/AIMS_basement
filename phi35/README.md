@@ -18,7 +18,8 @@
 | `retrieval.py` | 검색 파일 읽기, 규칙 준수 하이라이트 |
 | `train.py` | downstream 학습 |
 | `infer.py` | `--mode baseline \| rag \| expert_cfg \| entropy` |
-| `evaluate.py` | val 체크포인트 선택(`select`), 결과표(`report`), yes/no 비교(`yesno`) |
+| `evaluate.py` | val 체크포인트 선택(`select`), 결과표(`report`), yes/no 비교(`yesno`), 논문 Table 6(`table6`) |
+| `table6.py` | Table 6 지표(ECE · ECE-t · BS-t · 선택 정확도–커버리지 AUC) |
 | `yesno.py` | yes/no 엔트로피 정의 D0 · D1 · D2와 비교 |
 
 채점 · 게이팅 · 하이라이트 규칙 · 검색 파일 생성은 `../common/`에 있다. 어떤 모드도 정답을 모델 입력에 넣지 않는다.
@@ -26,6 +27,8 @@
 실험 행: 베이스라인(릴리스된 예측), w/ RAG, w/ 5% RAG, w/ 5% Expert-CFG(γ=1.5, α=0.01, β=3, δ=log β+2). 4.44.2에서 새로 만든 베이스라인은 `baseline-4.44.2-check` 행으로 따로 적는다.
 
 yes/no 불확실성 비교(노트북 8절)는 논문의 closed AUC와의 차이가 확률 정의에서 오는지 val에서 확인하는 실험이다. 공식 정의는 D0(식 4)이며 D1 · D2는 val 확인용이다.
+
+논문 Table 6의 파인튜닝 두 행은 노트북 9절에서 계산한다. 그 표의 AUC는 인용 문헌의 선택 정확도–커버리지 AUC로 해석하며(논문에 명시는 없음), ROC-AUC(Figure 3)와 다른 지표다.
 
 ## 실행
 

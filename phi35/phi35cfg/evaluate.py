@@ -5,6 +5,7 @@
       --rag100 rag.jsonl --rag5 rag5.jsonl --cfg5 cfg5.jsonl --out-dir results
   python -m phi35cfg.evaluate yesno --vqarad val_pred.jsonl val_probs.jsonl --slake val_pred.jsonl val_probs.jsonl \
       --out yesno_report.json
+  python -m phi35cfg.evaluate table6 --dataset vqarad --run table6_test.jsonl --out table6_vqarad.json
 
 Top-x% rows keep the baseline answer for every question that was not selected; a run file must cover
 exactly its target questions.
@@ -18,7 +19,7 @@ import numpy as np
 
 from .data import DATASETS, align, check_records, load_split, read_predictions
 from .infer import load_entropy, select_ids
-from . import yesno
+from . import table6, yesno
 from common import vqa_scoring as vs
 from common.gating import auc_wrong_vs_entropy
 
@@ -29,6 +30,12 @@ PAPER = {
     'slake': {'baseline': (82.95, 88.70, 85.20), 'RAG-100': (82.79, 89.90, 85.58),
               'RAG-5': (82.64, 89.42, 85.30), 'ExpertCFG-5': (85.27, 91.59, 87.75)},
 }
+# Table 6 (appendix D), Phi3.5V-Med fine-tuned, (ECE, ECE-t, BS-t, AUC)
+PAPER_T6 = {'vqarad': {'Label prob.': (.089, .019, .077, .889), 'Entropy': (.068, .024, .066, .958)},
+            'slake': {'Label prob.': (.082, .026, .071, .895), 'Entropy': (.073, .024, .063, .949)}}
+T6_KEYS = ('ece', 'ece_t', 'bs_t', 'auc')
+T6_NOTE = ('AUC is the area under the selective accuracy - coverage curve (reference [44]), not ROC-AUC; a random '
+           'ordering scores the accuracy. Definitions: docs/superpowers/specs/2026-11-28-table6-design.md')
 CHECK_ROW = 'baseline-4.44.2-check'
 SEED = 42
 
@@ -200,6 +207,40 @@ def _yesno(a):
     print('Saved:', out)
 
 
+def _table6(a):
+    rows, _ = load_split(a.dataset, 'test', data_root=a.data_root, check_images=False)
+    name = Path(a.run).name
+    records = read_predictions(a.run)
+    check_records(rows, records, name)
+    meta = _read_meta(a.run, required=True)
+    if meta.get('split') != 'test':
+        raise ValueError(f'{name}: split {meta.get("split")!r}; Table 6 is on test')
+    wrong = sorted({str(r.get('mode')) for r in records.values() if r.get('mode') != 'table6'})
+    if wrong:
+        raise ValueError(f"{name}: expected mode 'table6', found {wrong}")
+    targets = {r['idx'] for r in rows if r['answer_type'] == 'CLOSED'}
+    if set(records) != targets:
+        raise ValueError(f'{name}: missing {len(targets - set(records))} closed questions, '
+                         f'unexpected {len(set(records) - targets)}')
+    subsets = table6.table([records[i] for i in sorted(targets)])
+    paper = {row: dict(zip(T6_KEYS, values)) for row, values in PAPER_T6[a.dataset].items()}
+    print(f'[{a.dataset}] Table 6, fine-tuned rows. {T6_NOTE}')
+    for subset, got in subsets.items():
+        print(f'{subset} (excluded: {got["n_excluded"]})')
+        print(f'  {"row":<20}{"n":>5}{"accuracy":>10}' + ''.join(f'{k:>8}' for k in T6_KEYS) + f'{"ROC":>8}')
+        for row, v in got['rows'].items():
+            roc = '-' if v['auroc'] is None else format(v['auroc'], '.3f')
+            print(f'  {row:<20}{v["n"]:>5}{v["accuracy"]:>10.3f}' + ''.join(f'{v[k]:8.3f}' for k in T6_KEYS)
+                  + f'{roc:>8}')
+            print(f'  {"  paper":<35}' + ''.join(f'{paper[row][k]:8.3f}' for k in T6_KEYS))
+    out = Path(a.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({'dataset': a.dataset, 'note': T6_NOTE, 'env': _env(meta),
+                               'adapter_sha256': meta.get('adapter_sha256'), 'subsets': subsets, 'paper': paper},
+                              indent=2), encoding='utf-8')
+    print('Saved:', out)
+
+
 def build_parser():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest='command', required=True)
@@ -228,6 +269,11 @@ def build_parser():
                        help=f'{name}: val baseline run and val yesno run')
     y.add_argument('--data-root')
     y.add_argument('--out', required=True)
+    t = sub.add_parser('table6', help='paper Table 6 (fine-tuned rows) from a table6 run on test')
+    t.add_argument('--dataset', required=True, choices=DATASETS)
+    t.add_argument('--run', required=True)
+    t.add_argument('--data-root')
+    t.add_argument('--out', required=True)
     return p
 
 
@@ -252,6 +298,8 @@ def main(argv=None):
         return
     if a.command == 'yesno':
         return _yesno(a)
+    if a.command == 'table6':
+        return _table6(a)
     if (a.rag5 or a.cfg5) and not a.entropy:
         parser.error('--rag5 / --cfg5 need --entropy')
     rows, base_scores, entropy, results = _report(a)       # every input is checked before anything is written
